@@ -1502,39 +1502,29 @@ function init() {
     const pinEl = document.getElementById('pinInput');
     if (pinEl) pinEl.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
 
-    // Pull latest data from server BEFORE restoring session
-    // This ensures PINs, tasks, etc. are up-to-date on every device
-    pullFromServer().then(() => {
-        // Re-populate dropdown in case users changed from server
-        userSelect.innerHTML = '<option value="">— Select your name —</option>' + users.map(u => `<option value="${u.name}">${u.name}${u.role === 'observer' ? ' (Observer)' : ''}</option>`).join('');
+    // Restore session FIRST (so login works immediately even if server is slow)
+    try {
+        const savedSession = localStorage.getItem('chc_current_user');
+        if (savedSession) {
+            const sessionData = JSON.parse(savedSession);
+            const user = users.find(u => u.name === sessionData.name);
+            if (user) {
+                currentUser = user;
+                transitionToApp();
+            }
+        }
+    } catch (e) { console.warn('Session restore failed:', e); }
 
-        // Restore session if previously logged in
-        try {
-            const savedSession = localStorage.getItem('chc_current_user');
-            if (savedSession) {
-                const sessionData = JSON.parse(savedSession);
-                const user = users.find(u => u.name === sessionData.name);
-                if (user) {
-                    currentUser = user;
-                    transitionToApp();
-                    return;
-                }
-            }
-        } catch (e) { console.warn('Session restore failed:', e); }
-    }).catch(() => {
-        // If pull fails (offline), still try to restore session from local data
-        try {
-            const savedSession = localStorage.getItem('chc_current_user');
-            if (savedSession) {
-                const sessionData = JSON.parse(savedSession);
-                const user = users.find(u => u.name === sessionData.name);
-                if (user) {
-                    currentUser = user;
-                    transitionToApp();
-                }
-            }
-        } catch (e) { console.warn('Session restore failed:', e); }
-    });
+    // Pull latest data from server in the background (non-blocking)
+    // This keeps PINs, tasks, etc. up-to-date across devices
+    if (SYNC_URL && isOnline) {
+        pullFromServer().then(() => {
+            // Re-populate dropdown in case users changed from server
+            userSelect.innerHTML = '<option value="">— Select your name —</option>' + users.map(u => `<option value="${u.name}">${u.name}${u.role === 'observer' ? ' (Observer)' : ''}</option>`).join('');
+        }).catch(err => {
+            console.warn('Background pull failed:', err);
+        });
+    }
 }
 
 function generateWeekRanges() {
@@ -3012,10 +3002,13 @@ async function syncToServer() {
     updateSyncIndicator();
 
     try {
-        // Send full state for sync
+        // Send full state for sync (timeout after 15 seconds)
+        const controller = new AbortController();
+        const syncTimeout = setTimeout(() => controller.abort(), 15000);
         const response = await fetch(SYNC_URL, {
             method: 'POST',
             redirect: 'follow',
+            signal: controller.signal,
             body: JSON.stringify({
                 action: 'fullSync',
                 tasks: tasks.map(t => ({
@@ -3025,6 +3018,7 @@ async function syncToServer() {
                 users: users
             })
         });
+        clearTimeout(syncTimeout);
 
         const result = await response.json();
 
@@ -3083,7 +3077,11 @@ async function pullFromServer() {
     if (!SYNC_URL || !isOnline) return;
 
     try {
-        const response = await fetch(SYNC_URL + '?action=getAll', { redirect: 'follow' });
+        // Timeout after 10 seconds to prevent hanging
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        const response = await fetch(SYNC_URL + '?action=getAll', { redirect: 'follow', signal: controller.signal });
+        clearTimeout(timeout);
         const result = await response.json();
 
         if (result.status === 'ok') {
