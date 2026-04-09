@@ -1,0 +1,3009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cultural Heritage Cluster — Task Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #00aeef;
+            --dark-navy: #003b5b;
+            --light-bg: #f4f8fb;
+            --surface-white: #ffffff;
+            --text-dark: #1a2332;
+            --text-dim: #6b7b8d;
+            --success: #00c4a0;
+            --danger: #ff6b6b;
+            --warning: #ffa94d;
+            --shadow: 0 2px 12px rgba(0, 59, 91, 0.08);
+            --shadow-lg: 0 4px 20px rgba(0, 59, 91, 0.12);
+            --radius-card: 12px;
+            --radius-pill: 9999px;
+            --radius-button: 8px;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #003b5b 0%, #00568a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-card {
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 50px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .login-logo {
+            width: 260px;
+            height: auto;
+            margin: 0 auto 30px;
+            display: block;
+        }
+
+        .login-card h1 {
+            font-size: 24px;
+            color: var(--dark-navy);
+            margin-bottom: 10px;
+        }
+
+        .login-card .subtitle {
+            color: var(--text-dim);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--dark-navy);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e7f1;
+            border-radius: var(--radius-button);
+            font-family: 'Nunito', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.1);
+        }
+
+        .form-group input[type="password"] {
+            letter-spacing: 4px;
+            font-size: 16px;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #003b5b 0%, #00568a 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius-button);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 59, 91, 0.3);
+        }
+
+        .sync-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+        .sync-indicator.online {
+            background: rgba(0, 196, 160, 0.15);
+            color: #00c4a0;
+        }
+        .sync-indicator.offline {
+            background: rgba(255, 169, 77, 0.15);
+            color: #ffa94d;
+        }
+        .sync-indicator.syncing {
+            background: rgba(0, 174, 239, 0.15);
+            color: #00aeef;
+        }
+        .sync-indicator.error {
+            background: rgba(255, 107, 107, 0.15);
+            color: #ff6b6b;
+        }
+        .sync-icon {
+            font-size: 16px;
+        }
+        .sync-indicator.syncing .sync-icon {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .sync-indicator:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .pending-count {
+            background: #ff6b6b;
+            color: white;
+            border-radius: 9999px;
+            padding: 1px 6px;
+            font-size: 10px;
+            margin-left: 4px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        header {
+            background: linear-gradient(135deg, #003b5b 0%, #00568a 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-logo {
+            height: 64px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .observer-badge {
+            background: var(--warning);
+            color: white;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .signout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: var(--radius-button);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .signout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            width: 200px;
+            background: var(--surface-white);
+            border-right: 1px solid #e0e7f1;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        .tab-btn {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            border-left: 3px solid transparent;
+            color: var(--text-dim);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            background-color: #f0f4f8;
+            color: var(--dark-navy);
+        }
+
+        .tab-btn.active {
+            border-left-color: var(--primary-blue);
+            color: var(--primary-blue);
+            background-color: #f0f4f8;
+        }
+
+        .tab-badge {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary-blue);
+            color: white;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: var(--radius-pill);
+            font-weight: 600;
+        }
+
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--dark-navy);
+            margin-bottom: 25px;
+        }
+
+        .kpi-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .kpi-card h3 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .kpi-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--dark-navy);
+        }
+
+        .kpi-card .sub {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 8px;
+        }
+
+        .spreadsheet-table {
+            width: 100%;
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            overflow: visible;
+            box-shadow: var(--shadow);
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .spreadsheet-table thead {
+            background: #f0f4f8;
+            border-bottom: 1px solid #e0e7f1;
+        }
+
+        .spreadsheet-table th {
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--dark-navy);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .spreadsheet-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e7f1;
+            font-size: 14px;
+            overflow: visible;
+            position: relative;
+        }
+
+        .spreadsheet-table tr:hover {
+            background-color: #f9fbfd;
+        }
+
+        .spreadsheet-table input,
+        .spreadsheet-table select,
+        .spreadsheet-table textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e0e7f1;
+            border-radius: 6px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 13px;
+        }
+
+        .spreadsheet-table input:focus,
+        .spreadsheet-table select:focus,
+        .spreadsheet-table textarea:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.1);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: var(--radius-button);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0095d0;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #00a587;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+        }
+
+        .btn-secondary {
+            background: #e0e7f1;
+            color: var(--dark-navy);
+        }
+
+        .btn-secondary:hover {
+            background: #d0dce8;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+
+        .row-number {
+            color: var(--text-dim);
+            font-weight: 600;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 30px;
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .data-table {
+            width: 100%;
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table thead {
+            background: #f0f4f8;
+            border-bottom: 1px solid #e0e7f1;
+        }
+
+        .data-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark-navy);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 12px;
+        }
+
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e7f1;
+        }
+
+        .data-table tbody tr:hover {
+            background-color: #f9fbfd;
+        }
+
+        .project-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-notstarted {
+            background: #e0e7f1;
+            color: var(--dark-navy);
+        }
+
+        .status-inprogress {
+            background: var(--warning);
+            color: white;
+        }
+
+        .status-completed {
+            background: var(--success);
+            color: white;
+        }
+
+        .priority-high {
+            background: var(--danger);
+            color: white;
+        }
+
+        .priority-medium {
+            background: var(--warning);
+            color: white;
+        }
+
+        .priority-low {
+            background: #a0d995;
+            color: white;
+        }
+
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary-blue);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .person-card {
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .person-card-content {
+            flex: 1;
+        }
+
+        .person-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark-navy);
+            margin-bottom: 5px;
+        }
+
+        .person-card .role {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: #e0e7f1;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--primary-blue);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+        }
+
+        .stat-value {
+            color: var(--dark-navy);
+            font-weight: 600;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--dark-navy);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #e0e7f1;
+            border-radius: var(--radius-button);
+            font-family: 'Nunito', sans-serif;
+            font-size: 13px;
+            min-width: 150px;
+        }
+
+        .combobox-container {
+            position: relative;
+        }
+
+        .combobox-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e0e7f1;
+            border-radius: var(--radius-button);
+            font-family: 'Nunito', sans-serif;
+            font-size: 13px;
+        }
+
+        .combobox-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 280px;
+            background: var(--surface-white);
+            border: 1px solid var(--primary-blue);
+            border-top: none;
+            border-radius: 0 0 var(--radius-button) var(--radius-button);
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .combobox-option {
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f4f8;
+            white-space: nowrap;
+        }
+
+        .combobox-option:last-child {
+            border-bottom: none;
+        }
+
+        .combobox-option:hover,
+        .combobox-option.highlighted {
+            background: #e8f4fd;
+            color: var(--primary-blue);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-lg);
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 9998;
+            animation: slideIn 0.3s ease, slideOut 0.3s ease 2.7s;
+            border-left: 4px solid var(--primary-blue);
+        }
+
+        .toast.success {
+            border-left-color: var(--success);
+        }
+
+        .toast.error {
+            border-left-color: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            color: var(--dark-navy);
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9997;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark-navy);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-dim);
+        }
+
+        .comment-list {
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .comment-item {
+            background: #f9fbfd;
+            padding: 12px;
+            border-radius: var(--radius-button);
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-blue);
+        }
+
+        .comment-author {
+            font-weight: 600;
+            color: var(--dark-navy);
+            font-size: 12px;
+        }
+
+        .comment-time {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-left: 8px;
+        }
+
+        .comment-text {
+            font-size: 13px;
+            color: var(--text-dark);
+            margin-top: 5px;
+        }
+
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .settings-form {
+            max-width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .settings-form .form-section:first-child {
+            grid-column: 1 / -1;
+        }
+
+        .form-section {
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 25px;
+            margin-bottom: 0;
+            box-shadow: var(--shadow);
+        }
+
+        .form-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark-navy);
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f4f8;
+            padding-bottom: 10px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-field label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--dark-navy);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-field input,
+        .form-field select {
+            padding: 10px;
+            border: 1px solid #e0e7f1;
+            border-radius: var(--radius-button);
+            font-family: 'Nunito', sans-serif;
+            font-size: 13px;
+        }
+
+        .form-field input:focus,
+        .form-field select:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.1);
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9fbfd;
+            border-radius: var(--radius-button);
+            margin-bottom: 8px;
+            border: 1px solid #e0e7f1;
+        }
+
+        .list-item-content {
+            flex: 1;
+        }
+
+        .list-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                display: flex;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid #e0e7f1;
+                overflow-x: auto;
+            }
+
+            .tab-btn {
+                border-left: none;
+                border-bottom: 3px solid transparent;
+                padding: 12px 20px;
+            }
+
+            .tab-btn.active {
+                border-left: none;
+                border-bottom-color: var(--primary-blue);
+            }
+
+            .main {
+                padding: 20px;
+            }
+
+            .kpi-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+            }
+
+            .filter-group select,
+            .filter-group input {
+                min-width: unset;
+            }
+
+            header {
+                flex-wrap: wrap;
+            }
+
+            .header-right {
+                width: 100%;
+                margin-top: 15px;
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loginContainer" class="login-container">
+    <div class="login-card">
+        <img id="logoLogin" class="login-logo" src="" alt="Logo">
+        <h1>Cultural Heritage Cluster</h1>
+        <p class="subtitle">Task Tracker</p>
+        <div class="form-group">
+            <label for="userSelect">Your Name</label>
+            <select id="userSelect">
+                <option value="">— Select your name —</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="pinInput">PIN (4 digits)</label>
+            <input id="pinInput" type="password" placeholder="••••" maxlength="4" inputmode="numeric">
+        </div>
+        <button class="login-btn" onclick="handleLogin()">Sign In</button>
+    </div>
+</div>
+
+<header id="header" class="hidden">
+    <div class="header-left">
+        <img id="logoHeader" class="header-logo" src="" alt="Logo">
+        <div class="header-title">Cultural Heritage Cluster Task Tracker</div>
+    </div>
+    <div class="header-right">
+        <div class="user-badge" id="userBadge">
+            <span id="currentUserName"></span>
+            <span id="currentUserRole"></span>
+            <span id="observerBadge" class="observer-badge" style="display:none;">OBSERVER</span>
+        </div>
+        <div id="syncIndicator" class="sync-indicator" title="Click to sync now" onclick="manualSync()">
+            <span id="syncIcon" class="sync-icon">&#x2601;</span>
+            <span id="syncText">Offline</span>
+        </div>
+        <button class="signout-btn" onclick="handleSignOut()">Sign Out</button>
+    </div>
+</header>
+
+<div id="mainContainer" class="container hidden">
+    <div class="sidebar">
+        <button class="tab-btn active" onclick="switchTab('log-task')">+ Log Task <span class="tab-badge" id="badge-log-task">0</span></button>
+        <button class="tab-btn" onclick="switchTab('all-tasks')">All Tasks <span class="tab-badge" id="badge-all-tasks">0</span></button>
+        <button class="tab-btn" onclick="switchTab('overview')">Overview <span class="tab-badge" id="badge-overview">0</span></button>
+        <button class="tab-btn" onclick="switchTab('team')">Team</button>
+        <button class="tab-btn" onclick="switchTab('projects')">Projects</button>
+        <button class="tab-btn" onclick="switchTab('timeline')">Timeline</button>
+        <button class="tab-btn" id="settingsTab" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <div class="main">
+        <!-- Log Task Tab -->
+        <div id="log-task" class="tab-content active">
+            <h2 class="section-title">Log New Task</h2>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="addSpreadsheetRow()">+ Add Row</button>
+                <button class="btn btn-success" onclick="saveAllTasks()">Save All Tasks</button>
+                <button class="btn btn-secondary" onclick="clearSpreadsheet()">Clear</button>
+            </div>
+            <table class="spreadsheet-table" id="spreadsheetTable">
+                <thead>
+                    <tr>
+                        <th style="width: 3%;">#</th>
+                        <th style="width: 12%;">Person</th>
+                        <th style="width: 12%;">Week</th>
+                        <th style="width: 10%;">Project</th>
+                        <th style="width: 18%;">Task Title</th>
+                        <th style="width: 17%;">Description</th>
+                        <th style="width: 7%;">Priority</th>
+                        <th style="width: 7%;">Status</th>
+                        <th style="width: 8%;">Comments</th>
+                        <th style="width: 6%;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="spreadsheetBody">
+                </tbody>
+            </table>
+
+            <h3 class="section-title" style="margin-top: 40px;">Recently Logged Tasks</h3>
+            <table class="data-table" id="recentTasksTable">
+                <thead>
+                    <tr>
+                        <th>Person</th>
+                        <th>Task Title</th>
+                        <th>Project</th>
+                        <th>Status</th>
+                        <th>Comments</th>
+                        <th>Logged</th>
+                    </tr>
+                </thead>
+                <tbody id="recentTasksBody">
+                </tbody>
+            </table>
+
+            <div class="kpi-cards" style="margin-top: 30px;">
+                <div class="kpi-card">
+                    <h3>Total Tasks Logged</h3>
+                    <div class="value" id="kpi-total-log">0</div>
+                    <div class="sub">This session</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>Completed</h3>
+                    <div class="value" id="kpi-completed-log">0</div>
+                    <div class="sub">Marked complete</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>In Progress</h3>
+                    <div class="value" id="kpi-inprogress-log">0</div>
+                    <div class="sub">Currently working</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>High Priority</h3>
+                    <div class="value" id="kpi-high-log">0</div>
+                    <div class="sub">Urgent tasks</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content">
+            <h2 class="section-title">Dashboard Overview</h2>
+            <div class="kpi-cards">
+                <div class="kpi-card">
+                    <h3>Total Tasks</h3>
+                    <div class="value" id="kpi-total">0</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>Completed</h3>
+                    <div class="value" id="kpi-completed">0</div>
+                    <div class="sub" id="completion-rate">0%</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>In Progress</h3>
+                    <div class="value" id="kpi-inprogress">0</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>High Priority</h3>
+                    <div class="value" id="kpi-high">0</div>
+                </div>
+            </div>
+
+            <div class="two-column">
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="completionRateChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Team Tab -->
+        <div id="team" class="tab-content">
+            <h2 class="section-title">Team Members</h2>
+            <div id="teamMembersContainer"></div>
+            <div class="chart-container">
+                <canvas id="workloadChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Projects Tab -->
+        <div id="projects" class="tab-content">
+            <h2 class="section-title">Project Analytics</h2>
+            <div class="two-column">
+                <div class="chart-container">
+                    <canvas id="projectsChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="projectStatusChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="heatmapChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Timeline Tab -->
+        <div id="timeline" class="tab-content">
+            <h2 class="section-title">Timeline & Activity</h2>
+            <div class="chart-container">
+                <canvas id="weeklyActivityChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="statusTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- All Tasks Tab -->
+        <div id="all-tasks" class="tab-content">
+            <h2 class="section-title">All Tasks</h2>
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label for="filterPerson">Person</label>
+                    <select id="filterPerson" onchange="applyFilters()">
+                        <option value="">All People</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterProject">Project</label>
+                    <select id="filterProject" onchange="applyFilters()">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterStatus">Status</label>
+                    <select id="filterStatus" onchange="applyFilters()">
+                        <option value="">All Status</option>
+                        <option value="Not Started">Not Started</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterWeek">Week</label>
+                    <select id="filterWeek" onchange="applyFilters()">
+                        <option value="">All Weeks</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="globalSearch">Search</label>
+                    <input id="globalSearch" type="text" placeholder="Search tasks..." onkeyup="applyFilters()">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-secondary" id="exportFilteredBtn" onclick="exportFilteredTasks()">Export Filtered</button>
+                <button class="btn btn-secondary" id="bulkUpdateBtn" onclick="showBulkUpdate()" style="display:none;">Mark Selected as Completed</button>
+            </div>
+
+            <table class="data-table" id="allTasksTable">
+                <thead>
+                    <tr>
+                        <th style="width: 30px;" id="bulkCheckHeader"><input type="checkbox" class="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th>
+                        <th>Person</th>
+                        <th>Task Title</th>
+                        <th>Project</th>
+                        <th>Week</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Comments</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="allTasksBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Settings Tab (Admin Only) -->
+        <div id="settings" class="tab-content">
+            <h2 class="section-title">Settings</h2>
+            <div class="settings-form">
+                <!-- Team Members -->
+                <div class="form-section">
+                    <h3>Team Members</h3>
+                    <div class="form-row full" style="margin-bottom: 15px;">
+                        <div style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 150px;">
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px;">Name</label>
+                                <input type="text" id="newMemberName" placeholder="Full name..." style="width:100%;padding:10px;border:1px solid #e0e7f1;border-radius:8px;font-family:'Nunito',sans-serif;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px;">Role</label>
+                                <select id="newMemberRole" style="width:100%;padding:10px;border:1px solid #e0e7f1;border-radius:8px;font-family:'Nunito',sans-serif;">
+                                    <option value="member">Member</option>
+                                    <option value="observer">Observer</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 100px;">
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px;">PIN</label>
+                                <input type="text" id="newMemberPin" placeholder="4 digits" maxlength="4" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #e0e7f1;border-radius:8px;font-family:'Nunito',sans-serif;">
+                            </div>
+                            <button class="btn btn-primary" onclick="addTeamMember()" style="height:42px;">Add Member</button>
+                        </div>
+                    </div>
+                    <div id="teamMembersSettings"></div>
+                </div>
+
+                <!-- Projects -->
+                <div class="form-section">
+                    <h3>Projects</h3>
+                    <div class="form-row full">
+                        <input type="text" id="newProjectInput" placeholder="Add new project..." style="padding: 10px; border: 1px solid #e0e7f1; border-radius: 8px;">
+                        <button class="btn btn-primary" onclick="addProject()" style="margin-top: 5px;">Add</button>
+                    </div>
+                    <div id="projectsSettings"></div>
+                </div>
+
+                <!-- Task Title Categories -->
+                <div class="form-section">
+                    <h3>Task Title Categories</h3>
+                    <div class="form-row full">
+                        <input type="text" id="newCategoryInput" placeholder="Add new category..." style="padding: 10px; border: 1px solid #e0e7f1; border-radius: 8px;">
+                        <button class="btn btn-primary" onclick="addCategory()" style="margin-top: 5px;">Add</button>
+                    </div>
+                    <div id="categoriesSettings"></div>
+                </div>
+
+                <!-- Data Management -->
+                <div class="form-section">
+                    <h3>Data Management</h3>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="exportCSV()">Export as CSV</button>
+                        <button class="btn btn-secondary" onclick="exportExcel()">Export as Excel</button>
+                        <button class="btn btn-secondary" onclick="importExcel()">Import Excel</button>
+                        <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
+                    </div>
+                </div>
+
+                <!-- User PINs -->
+                <div class="form-section">
+                    <h3>User PIN Management</h3>
+                    <div id="pinSettings"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comment Modal -->
+<div id="commentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>Task Comments</span>
+            <button class="modal-close" onclick="closeCommentModal()">×</button>
+        </div>
+        <div class="comment-list" id="commentList"></div>
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="commentInput" placeholder="Add a comment..." style="flex: 1; padding: 10px; border: 1px solid #e0e7f1; border-radius: 8px;">
+            <button class="btn btn-primary btn-sm" onclick="addComment()">Post</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Task Modal (for All Tasks) -->
+<div id="editTaskModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>Edit Task</span>
+            <button class="modal-close" onclick="closeEditTaskModal()">×</button>
+        </div>
+        <div class="form-section" style="box-shadow: none; padding: 0;">
+            <div class="form-field" style="margin-bottom: 15px;">
+                <label>Task Title</label>
+                <input type="text" id="editTaskTitle">
+            </div>
+            <div class="form-field" style="margin-bottom: 15px;">
+                <label>Description</label>
+                <textarea id="editTaskDescription" style="padding: 10px; border: 1px solid #e0e7f1; border-radius: 8px; font-family: 'Nunito', sans-serif; font-size: 13px; height: 80px;"></textarea>
+            </div>
+            <div class="form-field" style="margin-bottom: 15px;">
+                <label>Priority</label>
+                <select id="editTaskPriority">
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                </select>
+            </div>
+            <div class="form-field" style="margin-bottom: 15px;">
+                <label>Status</label>
+                <select id="editTaskStatus">
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-success" onclick="saveEditedTask()">Save</button>
+                <button class="btn btn-secondary" onclick="closeEditTaskModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="fileInput" style="display:none;">
+    <input type="file" id="excelFileInput" accept=".xlsx,.xls" onchange="handleExcelImport()">
+</div>
+
+<script>
+const LOGO_DATA = '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';
+
+// ============ STATE ============
+let currentUser = null;
+let tasks = [];
+let projects = ['CHANGES', 'LIP3D', 'EXCALIBUR', 'EXCELSIOR', 'REVITALISER', 'SPACE BIC', 'EU Presidency', 'CPP4ALL (COST)'];
+let taskCategories = ['Abstract / Proposal Submission', 'Administrative Follow-up', 'Consortium Meeting', 'Data Research & Analysis', 'Database / Website Development', 'Digital Tool / Platform Development', 'Dissemination & Outreach', 'Event Participation', 'Event Planning & Logistics', 'External Stakeholder Meeting', 'Institutional Collaboration', 'Internal Meeting', 'Manuscript Writing/Review/Proofreading', 'MoU / Agreement Preparation', 'Pilot Projects', 'Preparation of Presentations', 'Press Release / Public Communication', 'Progress / Review Meeting', 'Project Coordination', 'Project Planning & Scheduling', 'Project Meeting', 'Proposal Writing / Preparation', 'Reports (internal, external, events, etc.)', 'Research Development', 'Scientific Collaboration Meeting', 'Social Media Content Preparation', 'Stakeholder Meeting', 'Training & Courses', 'Travel Coordination'];
+let weeks = generateWeekRanges();
+let users = [
+    { name: 'Mahmoud Mardini', role: 'admin', pin: '1234' },
+    { name: 'Konstantinos Roussos', role: 'member', pin: '1234' },
+    { name: 'Andreas Livadiotis', role: 'member', pin: '1234' },
+    { name: 'Dante Abate', role: 'observer', pin: '1234' },
+    { name: 'Christodoulos Mettas', role: 'observer', pin: '1234' }
+];
+
+const projectColors = {
+    'CHANGES': '#ff6b6b',
+    'LIP3D': '#4ecdc4',
+    'EXCALIBUR': '#45b7d1',
+    'EXCELSIOR': '#96ceb4',
+    'REVITALISER': '#ffeaa7',
+    'SPACE BIC': '#dda0dd',
+    'EU Presidency': '#87ceeb',
+    'CPP4ALL (COST)': '#f0ad4e'
+};
+
+let editingTaskId = null;
+let commentingTaskId = null;
+let currentChart = {};
+
+// ============ INITIALIZATION ============
+function init() {
+    const logoB64 = 'data:image/png;base64,' + LOGO_DATA;
+    document.getElementById('logoLogin').src = logoB64;
+    document.getElementById('logoHeader').src = logoB64;
+    loadFromLocalStorage();
+    // Populate login dropdown from users array (may have been updated via settings)
+    const userSelect = document.getElementById('userSelect');
+    userSelect.innerHTML = '<option value="">— Select your name —</option>' + users.map(u => `<option value="${u.name}">${u.name}${u.role === 'observer' ? ' (Observer)' : ''}</option>`).join('');
+    const pinEl = document.getElementById('pinInput');
+    if (pinEl) pinEl.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
+}
+
+function generateWeekRanges() {
+    const ranges = [];
+    const start = new Date(2025, 10, 3); // Monday, Nov 3, 2025
+    const end = new Date(2026, 11, 31); // End of December 2026
+
+    let current = new Date(start);
+    while (current <= end) {
+        if (current.getDay() === 1) { // Monday
+            const weekStart = new Date(current);
+            const weekEnd = new Date(current);
+            weekEnd.setDate(weekEnd.getDate() + 4); // Friday
+
+            if (weekStart.getMonth() === weekEnd.getMonth()) {
+                ranges.push(formatWeekRange(weekStart, weekEnd, false));
+            } else {
+                ranges.push(formatWeekRange(weekStart, weekEnd, true));
+            }
+        }
+        current.setDate(current.getDate() + 1);
+    }
+
+    return ranges;
+}
+
+function formatWeekRange(start, end, crossing) {
+    const pad = n => String(n).padStart(2, '0');
+    const dayStart = pad(start.getDate());
+    const dayEnd = pad(end.getDate());
+    const monthStart = start.toLocaleString('en-US', { month: 'short' });
+    const monthEnd = end.toLocaleString('en-US', { month: 'short' });
+    const year = end.getFullYear();
+
+    if (crossing) {
+        return `${dayStart} ${monthStart} \u2013 ${dayEnd} ${monthEnd} ${year}`;
+    } else {
+        return `${dayStart}\u2013${dayEnd} ${monthStart} ${year}`;
+    }
+}
+
+function getCurrentWeek() {
+    const today = new Date();
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    for (const week of weeks) {
+        // Parse "DD–DD Mon YYYY" or "DD Mon – DD Mon YYYY"
+        const crossMatch = week.match(/(\d+)\s+(\w+)\s+\u2013\s+(\d+)\s+(\w+)\s+(\d+)/);
+        const sameMatch = week.match(/(\d+)\u2013(\d+)\s+(\w+)\s+(\d+)/);
+        let monDate, friDate;
+        if (crossMatch) {
+            monDate = new Date(parseInt(crossMatch[5]), months[crossMatch[2]], parseInt(crossMatch[1]));
+            friDate = new Date(parseInt(crossMatch[5]), months[crossMatch[4]], parseInt(crossMatch[3]));
+        } else if (sameMatch) {
+            monDate = new Date(parseInt(sameMatch[4]), months[sameMatch[3]], parseInt(sameMatch[1]));
+            friDate = new Date(parseInt(sameMatch[4]), months[sameMatch[3]], parseInt(sameMatch[2]));
+        } else continue;
+        if (today >= monDate && today <= friDate) return week;
+    }
+    // If no match, find the closest future week
+    return weeks[0] || '';
+}
+
+// ============ AUTH ============
+function handleLogin() {
+    const name = document.getElementById('userSelect').value;
+    const pin = document.getElementById('pinInput').value;
+
+    if (!name || !pin) {
+        showToast('Please select a name and enter PIN', 'error');
+        return;
+    }
+
+    const user = users.find(u => u.name === name && u.pin === pin);
+    if (!user) {
+        showToast('Invalid name or PIN', 'error');
+        return;
+    }
+
+    currentUser = user;
+    showToast(`Welcome, ${currentUser.name}!`, 'success');
+    transitionToApp();
+}
+
+function handleSignOut() {
+    currentUser = null;
+    document.getElementById('loginContainer').classList.remove('hidden');
+    document.getElementById('header').classList.add('hidden');
+    document.getElementById('mainContainer').classList.add('hidden');
+    document.getElementById('userSelect').value = '';
+    document.getElementById('pinInput').value = '';
+}
+
+function transitionToApp() {
+    document.getElementById('loginContainer').classList.add('hidden');
+    document.getElementById('header').classList.remove('hidden');
+    document.getElementById('mainContainer').classList.remove('hidden');
+
+    document.getElementById('currentUserName').textContent = currentUser.name;
+    document.getElementById('currentUserRole').textContent = `(${currentUser.role})`;
+
+    if (currentUser.role === 'observer') {
+        document.getElementById('observerBadge').style.display = 'inline-block';
+    } else {
+        document.getElementById('observerBadge').style.display = 'none';
+    }
+
+    if (currentUser.role !== 'admin') {
+        document.getElementById('settingsTab').style.display = 'none';
+    } else {
+        document.getElementById('settingsTab').style.display = 'block';
+    }
+
+    initializeApp();
+}
+
+// ============ TAB SWITCHING ============
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+    document.getElementById(tabName).classList.add('active');
+    const clickedTab = document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
+    if (clickedTab) clickedTab.classList.add('active');
+
+    if (tabName === 'log-task') {
+        initSpreadsheet();
+    } else if (tabName === 'overview') {
+        updateOverview();
+    } else if (tabName === 'team') {
+        updateTeamTab();
+    } else if (tabName === 'projects') {
+        updateProjectsTab();
+    } else if (tabName === 'timeline') {
+        updateTimelineTab();
+    } else if (tabName === 'all-tasks') {
+        updateAllTasksTab();
+    } else if (tabName === 'settings') {
+        updateSettingsTab();
+    }
+}
+
+// ============ LOG TASK TAB ============
+function initSpreadsheet() {
+    const tbody = document.getElementById('spreadsheetBody');
+    tbody.innerHTML = '';
+
+    for (let i = 0; i < 3; i++) {
+        addSpreadsheetRow(true);
+    }
+
+    updateRecentTasks();
+    updateLogKPIs();
+}
+
+function addSpreadsheetRow(silent = false) {
+    const tbody = document.getElementById('spreadsheetBody');
+    const rowNum = tbody.children.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td class="row-number">${rowNum}</td>
+        <td>
+            <select class="personSelect">
+                ${currentUser.role === 'member' ? `<option value="${currentUser.name}">${currentUser.name}</option>` : `<option value="">Select...</option>${users.map(u => `<option value="${u.name}">${u.name}</option>`).join('')}`}
+            </select>
+        </td>
+        <td>
+            <div class="combobox-container">
+                <input type="text" class="weekInput combobox-input" placeholder="Select week..." data-list="weeks">
+                <div class="combobox-dropdown" style="display:none;"></div>
+            </div>
+        </td>
+        <td>
+            <select class="projectSelect">
+                <option value="">Select...</option>
+                ${projects.map(p => `<option value="${p}">${p}</option>`).join('')}
+            </select>
+        </td>
+        <td>
+            <div class="combobox-container">
+                <input type="text" class="titleInput combobox-input" placeholder="Search/type..." data-list="categories">
+                <div class="combobox-dropdown" style="display:none;"></div>
+            </div>
+        </td>
+        <td><textarea style="height: 40px;" class="descInput" placeholder="Describe..."></textarea></td>
+        <td>
+            <select class="prioritySelect">
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+            </select>
+        </td>
+        <td>
+            <select class="statusSelect">
+                <option value="Not Started">Not Started</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+            </select>
+        </td>
+        <td><input type="text" class="commentInput" placeholder="Notes..."></td>
+        <td>
+            <div class="action-buttons">
+                <button class="btn btn-sm btn-primary" onclick="duplicateRow(this)">Dup</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteRow(this)">Del</button>
+            </div>
+        </td>
+    `;
+    tbody.appendChild(row);
+
+    // Set current week default
+    if (rowNum === 1) {
+        row.querySelector('.weekInput').value = getCurrentWeek();
+    }
+
+    // Auto-set user for members
+    if (currentUser.role === 'member') {
+        row.querySelector('.personSelect').value = currentUser.name;
+    }
+
+    // Init comboboxes
+    initCombobox(row.querySelector('.weekInput'), weeks);
+    initCombobox(row.querySelector('.titleInput'), taskCategories);
+
+    // Keyboard shortcuts
+    const lastInput = row.querySelector('.commentInput');
+    lastInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+            saveAllTasks();
+            addSpreadsheetRow();
+        }
+    });
+}
+
+function duplicateRow(btn) {
+    const row = btn.closest('tr');
+    const rowNum = row.querySelector('.row-number').textContent;
+    const tbody = row.parentElement;
+    const newRow = row.cloneNode(true);
+
+    // Clear title and description
+    newRow.querySelector('.titleInput').value = '';
+    newRow.querySelector('.descInput').value = '';
+
+    tbody.insertBefore(newRow, row.nextSibling);
+
+    // Reinit comboboxes
+    initCombobox(newRow.querySelector('.weekInput'), weeks);
+    initCombobox(newRow.querySelector('.titleInput'), taskCategories);
+
+    updateRowNumbers();
+}
+
+function deleteRow(btn) {
+    btn.closest('tr').remove();
+    updateRowNumbers();
+}
+
+function updateRowNumbers() {
+    const rows = document.querySelectorAll('#spreadsheetBody tr');
+    rows.forEach((row, idx) => {
+        row.querySelector('.row-number').textContent = idx + 1;
+    });
+}
+
+function initCombobox(input, options) {
+    const container = input.parentElement;
+    const dropdown = container.querySelector('.combobox-dropdown');
+    let highlightedIndex = -1;
+
+    input.addEventListener('focus', () => {
+        renderOptions(options.filter(o => o.toLowerCase().includes(input.value.toLowerCase())));
+        dropdown.style.display = 'block';
+    });
+
+    input.addEventListener('input', () => {
+        const filtered = options.filter(o => o.toLowerCase().includes(input.value.toLowerCase()));
+        renderOptions(filtered);
+        highlightedIndex = -1;
+    });
+
+    input.addEventListener('keydown', e => {
+        const items = dropdown.querySelectorAll('.combobox-option');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
+            updateHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlightedIndex = Math.max(highlightedIndex - 1, -1);
+            updateHighlight();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlightedIndex >= 0) {
+                items[highlightedIndex].click();
+            }
+            dropdown.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', e => {
+        if (!container.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    function renderOptions(opts) {
+        dropdown.innerHTML = opts.map((opt, idx) => `<div class="combobox-option" data-value="${opt}">${opt}</div>`).join('');
+        dropdown.querySelectorAll('.combobox-option').forEach(item => {
+            item.addEventListener('click', () => {
+                input.value = item.dataset.value;
+                dropdown.style.display = 'none';
+            });
+        });
+    }
+
+    function updateHighlight() {
+        const items = dropdown.querySelectorAll('.combobox-option');
+        items.forEach((item, idx) => {
+            item.classList.toggle('highlighted', idx === highlightedIndex);
+        });
+    }
+}
+
+function saveAllTasks() {
+    const rows = document.querySelectorAll('#spreadsheetBody tr');
+    let newCount = 0;
+
+    rows.forEach(row => {
+        const person = row.querySelector('.personSelect').value;
+        const week = row.querySelector('.weekInput').value;
+        const project = row.querySelector('.projectSelect').value;
+        const title = row.querySelector('.titleInput').value;
+        const desc = row.querySelector('.descInput').value;
+        const priority = row.querySelector('.prioritySelect').value;
+        const status = row.querySelector('.statusSelect').value;
+        const comments = row.querySelector('.commentInput').value;
+
+        if (person && week && project && title) {
+            const existingIndex = tasks.findIndex(t => t.person === person && t.week === week && t.taskTitle === title);
+            const task = {
+                id: existingIndex >= 0 ? tasks[existingIndex].id : String(Date.now() + Math.random()),
+                person,
+                week,
+                project,
+                taskTitle: title,
+                taskDescription: desc,
+                priority,
+                status,
+                comments,
+                observerComments: existingIndex >= 0 ? tasks[existingIndex].observerComments : [],
+                createdAt: existingIndex >= 0 ? tasks[existingIndex].createdAt : new Date().toISOString()
+            };
+
+            if (existingIndex >= 0) {
+                tasks[existingIndex] = task;
+            } else {
+                tasks.push(task);
+                newCount++;
+            }
+        }
+    });
+
+    saveToLocalStorage();
+    showToast(`Saved ${newCount} new task(s)`, 'success');
+    updateRecentTasks();
+    updateLogKPIs();
+}
+
+function clearSpreadsheet() {
+    if (confirm('Clear all rows? (Data will be lost if not saved)')) {
+        document.getElementById('spreadsheetBody').innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            addSpreadsheetRow(true);
+        }
+    }
+}
+
+function updateRecentTasks() {
+    const recent = tasks.slice(-5).reverse();
+    const tbody = document.getElementById('recentTasksBody');
+    tbody.innerHTML = recent.map(task => {
+        const commentText = task.comments ? task.comments.substring(0, 50) + (task.comments.length > 50 ? '...' : '') : '—';
+        return `
+        <tr>
+            <td>${task.person}</td>
+            <td>${task.taskTitle}</td>
+            <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${task.project}</span></td>
+            <td><span class="status-badge status-${task.status.toLowerCase().replace(' ', '')}">${task.status}</span></td>
+            <td style="font-size:12px;color:#6b7b8d;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(task.comments||'').replace(/"/g,'&quot;')}">${commentText}</td>
+            <td>${new Date(task.createdAt).toLocaleDateString()}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center; color: #999;">No tasks logged yet</td></tr>';
+}
+
+function updateLogKPIs() {
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === 'Completed').length;
+    const inProgress = tasks.filter(t => t.status === 'In Progress').length;
+    const highPriority = tasks.filter(t => t.priority === 'High').length;
+
+    document.getElementById('kpi-total-log').textContent = total;
+    document.getElementById('kpi-completed-log').textContent = completed;
+    document.getElementById('kpi-inprogress-log').textContent = inProgress;
+    document.getElementById('kpi-high-log').textContent = highPriority;
+
+    updateTabBadges();
+}
+
+// ============ OVERVIEW TAB ============
+function updateOverview() {
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === 'Completed').length;
+    const inProgress = tasks.filter(t => t.status === 'In Progress').length;
+    const highPriority = tasks.filter(t => t.priority === 'High').length;
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    document.getElementById('kpi-total').textContent = total;
+    document.getElementById('kpi-completed').textContent = completed;
+    document.getElementById('completion-rate').textContent = `${completionRate}% done`;
+    document.getElementById('kpi-inprogress').textContent = inProgress;
+    document.getElementById('kpi-high').textContent = highPriority;
+
+    createStatusChart();
+    createPriorityChart();
+    createCompletionRateChart();
+}
+
+function createStatusChart() {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    const statuses = ['Not Started', 'In Progress', 'Completed'];
+    const statusData = statuses.map(s => tasks.filter(t => t.status === s).length);
+
+    if (currentChart.statusChart) currentChart.statusChart.destroy();
+    currentChart.statusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: statuses,
+            datasets: [{
+                data: statusData,
+                backgroundColor: ['#e0e7f1', '#ffa94d', '#00c4a0'],
+                borderColor: 'white',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: "'Nunito', sans-serif" }, usePointStyle: true } },
+                title: { display: true, text: 'Tasks by Status', font: { size: 14, weight: 'bold' } }
+            }
+        }
+    });
+}
+
+function createPriorityChart() {
+    const ctx = document.getElementById('priorityChart').getContext('2d');
+    const priorities = ['Low', 'Medium', 'High'];
+    const priorityData = priorities.map(p => tasks.filter(t => t.priority === p).length);
+
+    if (currentChart.priorityChart) currentChart.priorityChart.destroy();
+    currentChart.priorityChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: priorities,
+            datasets: [{
+                data: priorityData,
+                backgroundColor: ['#a0d995', '#ffa94d', '#ff6b6b'],
+                borderColor: 'white',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: "'Nunito', sans-serif" }, usePointStyle: true } },
+                title: { display: true, text: 'Tasks by Priority', font: { size: 14, weight: 'bold' } }
+            }
+        }
+    });
+}
+
+function createCompletionRateChart() {
+    const ctx = document.getElementById('completionRateChart').getContext('2d');
+    const members = [...new Set(tasks.map(t => t.person))];
+    const data = members.map(member => {
+        const memberTasks = tasks.filter(t => t.person === member);
+        const completed = memberTasks.filter(t => t.status === 'Completed').length;
+        return memberTasks.length > 0 ? (completed / memberTasks.length) * 100 : 0;
+    });
+
+    if (currentChart.completionChart) currentChart.completionChart.destroy();
+    currentChart.completionChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: members,
+            datasets: [{
+                label: 'Completion Rate %',
+                data: data,
+                backgroundColor: '#00aeef',
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'x',
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Completion Rate by Member', font: { size: 14, weight: 'bold' } }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { callback: v => v + '%' }
+                }
+            }
+        }
+    });
+}
+
+// ============ TEAM TAB ============
+function updateTeamTab() {
+    const members = [...new Set(tasks.map(t => t.person))].sort();
+    const container = document.getElementById('teamMembersContainer');
+
+    if (members.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No tasks yet</h3><p>Start logging tasks to see team stats</p></div>';
+        return;
+    }
+
+    container.innerHTML = members.map(member => {
+        const memberTasks = tasks.filter(t => t.person === member);
+        const completed = memberTasks.filter(t => t.status === 'Completed').length;
+        const inProgress = memberTasks.filter(t => t.status === 'In Progress').length;
+        const rate = memberTasks.length > 0 ? Math.round((completed / memberTasks.length) * 100) : 0;
+
+        return `
+            <div class="person-card">
+                <div class="avatar">${member.charAt(0).toUpperCase()}</div>
+                <div class="person-card-content">
+                    <h3>${member}</h3>
+                    <div class="role">${users.find(u => u.name === member)?.role || 'member'}</div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: ${rate}%;"></div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Tasks</span>
+                        <span class="stat-value">${memberTasks.length}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Completed</span>
+                        <span class="stat-value">${completed}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">In Progress</span>
+                        <span class="stat-value">${inProgress}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Completion Rate</span>
+                        <span class="stat-value">${rate}%</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    createWorkloadChart();
+}
+
+function createWorkloadChart() {
+    const ctx = document.getElementById('workloadChart').getContext('2d');
+    const members = [...new Set(tasks.map(t => t.person))].sort();
+    const weeklyData = {};
+
+    weeks.forEach(w => {
+        weeklyData[w] = members.map(m => tasks.filter(t => t.person === m && t.week === w).length);
+    });
+
+    if (currentChart.workloadChart) currentChart.workloadChart.destroy();
+    currentChart.workloadChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: weeks,
+            datasets: members.map((m, idx) => ({
+                label: m,
+                data: weeks.map(w => weeklyData[w][idx]),
+                borderColor: [' #00aeef', '#ff6b6b', '#ffa94d', '#00c4a0', '#4ecdc4'][idx % 5],
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+            }))
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: "'Nunito', sans-serif" }, usePointStyle: true } },
+                title: { display: true, text: 'Workload Over Time', font: { size: 14, weight: 'bold' } }
+            },
+            scales: {
+                x: { ticks: { maxRotation: 45 } }
+            }
+        }
+    });
+}
+
+// ============ PROJECTS TAB ============
+function updateProjectsTab() {
+    createProjectsChart();
+    createProjectStatusChart();
+    createHeatmapChart();
+}
+
+function createProjectsChart() {
+    const ctx = document.getElementById('projectsChart').getContext('2d');
+    const projectTasks = projects.map(p => tasks.filter(t => t.project === p).length);
+
+    if (currentChart.projectsChart) currentChart.projectsChart.destroy();
+    currentChart.projectsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: projects,
+            datasets: [{
+                label: 'Task Count',
+                data: projectTasks,
+                backgroundColor: projects.map(p => projectColors[p]),
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Tasks per Project', font: { size: 14, weight: 'bold' } }
+            }
+        }
+    });
+}
+
+function createProjectStatusChart() {
+    const ctx = document.getElementById('projectStatusChart').getContext('2d');
+    const statuses = ['Not Started', 'In Progress', 'Completed'];
+    const datasets = statuses.map((status, idx) => ({
+        label: status,
+        data: projects.map(p => tasks.filter(t => t.project === p && t.status === status).length),
+        backgroundColor: ['#e0e7f1', '#ffa94d', '#00c4a0'][idx]
+    }));
+
+    if (currentChart.projectStatusChart) currentChart.projectStatusChart.destroy();
+    currentChart.projectStatusChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: projects,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true } },
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: "'Nunito', sans-serif" }, usePointStyle: true } },
+                title: { display: true, text: 'Project Status Breakdown', font: { size: 14, weight: 'bold' } }
+            }
+        }
+    });
+}
+
+function createHeatmapChart() {
+    const ctx = document.getElementById('heatmapChart').getContext('2d');
+    const members = [...new Set(tasks.map(t => t.person))].sort();
+    const heatmapData = [];
+
+    projects.forEach((proj, y) => {
+        members.forEach((member, x) => {
+            const count = tasks.filter(t => t.project === proj && t.person === member).length;
+            if (count > 0) {
+                heatmapData.push({ x: member, y: proj, v: count });
+            }
+        });
+    });
+
+    if (currentChart.heatmapChart) currentChart.heatmapChart.destroy();
+    currentChart.heatmapChart = new Chart(ctx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Task Count',
+                data: heatmapData.map(d => ({ x: [...members].indexOf(d.x), y: [...projects].indexOf(d.y), r: 5 + d.v * 3 })),
+                backgroundColor: 'rgba(0, 174, 239, 0.5)',
+                borderColor: '#00aeef',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Project × Member Workload', font: { size: 14, weight: 'bold' } }
+            },
+            scales: {
+                x: { ticks: { callback: (v, idx) => members[v] || '' }, min: -0.5, max: members.length - 0.5 },
+                y: { ticks: { callback: (v, idx) => projects[v] || '' }, min: -0.5, max: projects.length - 0.5 }
+            }
+        }
+    });
+}
+
+// ============ TIMELINE TAB ============
+function updateTimelineTab() {
+    createWeeklyActivityChart();
+    createStatusTrendChart();
+}
+
+function createWeeklyActivityChart() {
+    const ctx = document.getElementById('weeklyActivityChart').getContext('2d');
+    const statuses = ['Not Started', 'In Progress', 'Completed'];
+    const datasets = statuses.map((status, idx) => ({
+        label: status,
+        data: weeks.map(w => tasks.filter(t => t.week === w && t.status === status).length),
+        backgroundColor: ['#e0e7f1', '#ffa94d', '#00c4a0'][idx]
+    }));
+
+    if (currentChart.weeklyActivityChart) currentChart.weeklyActivityChart.destroy();
+    currentChart.weeklyActivityChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: weeks,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true } },
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: "'Nunito', sans-serif" }, usePointStyle: true } },
+                title: { display: true, text: 'Weekly Activity', font: { size: 14, weight: 'bold' } }
+            }
+        }
+    });
+}
+
+function createStatusTrendChart() {
+    const ctx = document.getElementById('statusTrendChart').getContext('2d');
+    const statuses = ['Not Started', 'In Progress', 'Completed'];
+    const datasets = statuses.map((status, idx) => ({
+        label: status,
+        data: weeks.map(w => tasks.filter(t => t.week === w && t.status === status).length),
+        borderColor: ['#e0e7f1', '#ffa94d', '#00c4a0'][idx],
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4
+    }));
+
+    if (currentChart.statusTrendChart) currentChart.statusTrendChart.destroy();
+    currentChart.statusTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: weeks,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: "'Nunito', sans-serif" }, usePointStyle: true } },
+                title: { display: true, text: 'Status Trends', font: { size: 14, weight: 'bold' } }
+            }
+        }
+    });
+}
+
+// ============ ALL TASKS TAB ============
+function updateAllTasksTab() {
+    // Set header visibility BEFORE rendering rows
+    if (currentUser.role === 'admin') {
+        document.getElementById('bulkCheckHeader').style.display = 'table-cell';
+        document.getElementById('bulkUpdateBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('bulkCheckHeader').style.display = 'none';
+        document.getElementById('bulkUpdateBtn').style.display = 'none';
+    }
+    populateFilterSelects();
+    applyFilters();
+}
+
+function populateFilterSelects() {
+    const people = [...new Set(tasks.map(t => t.person))].sort();
+    const projectsUsed = [...new Set(tasks.map(t => t.project))].sort();
+    const weeksUsed = [...new Set(tasks.map(t => t.week))];
+
+    document.getElementById('filterPerson').innerHTML = '<option value="">All People</option>' + people.map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('filterProject').innerHTML = '<option value="">All Projects</option>' + projectsUsed.map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('filterWeek').innerHTML = '<option value="">All Weeks</option>' + weeksUsed.map(w => `<option value="${w}">${w}</option>`).join('');
+}
+
+function applyFilters() {
+    const person = document.getElementById('filterPerson').value;
+    const project = document.getElementById('filterProject').value;
+    const status = document.getElementById('filterStatus').value;
+    const week = document.getElementById('filterWeek').value;
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+
+    let filtered = tasks.filter(t => {
+        if (person && t.person !== person) return false;
+        if (project && t.project !== project) return false;
+        if (status && t.status !== status) return false;
+        if (week && t.week !== week) return false;
+        if (search && !(t.taskTitle||'').toLowerCase().includes(search) && !(t.taskDescription||'').toLowerCase().includes(search) && !(t.comments||'').toLowerCase().includes(search)) return false;
+        return true;
+    });
+
+    const tbody = document.getElementById('allTasksBody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:#999;">No tasks match your filters</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(task => {
+        try {
+            const isOwner = task.person === currentUser.name;
+            const canEdit = currentUser.role === 'admin' || isOwner;
+            const canDelete = currentUser.role === 'admin';
+            const isObserver = currentUser.role === 'observer';
+            const safeId = String(task.id || Date.now()).replace(/'/g, "\\'");
+            const commentCount = (task.observerComments || []).length;
+            const commentPreview = (task.comments || '') ? (task.comments || '').substring(0, 40) + ((task.comments || '').length > 40 ? '...' : '') : '';
+            const priority = task.priority || 'Medium';
+            const status = task.status || 'Not Started';
+
+            return `
+                <tr>
+                    ${currentUser.role === 'admin' ? `<td><input type="checkbox" class="checkbox task-checkbox" data-task-id="${safeId}"></td>` : ''}
+                    <td>${task.person || ''}</td>
+                    <td>${task.taskTitle || ''}</td>
+                    <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${task.project || ''}</span></td>
+                    <td>${task.week || ''}</td>
+                    <td><span class="priority-${priority.toLowerCase()}">${priority}</span></td>
+                    <td><span class="status-badge status-${status.toLowerCase().replace(' ', '')}">${status}</span></td>
+                    <td style="font-size:12px;color:#6b7b8d;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(task.comments||'').replace(/"/g,'&quot;')}">${commentPreview}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${canEdit ? `<button class="btn btn-sm btn-primary" onclick="openEditTaskModal('${safeId}')">Edit</button>` : ''}
+                            ${canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteTaskById('${safeId}')">Del</button>` : ''}
+                            <button class="btn btn-sm btn-secondary" onclick="openCommentModal('${safeId}')">${commentCount > 0 ? '💬' + commentCount : '💬'}</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        } catch (e) {
+            console.error('Error rendering task row:', e, task);
+            return '';
+        }
+    }).join('');
+}
+
+function openEditTaskModal(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+    editingTaskId = task.id;
+
+    document.getElementById('editTaskTitle').value = task.taskTitle;
+    document.getElementById('editTaskDescription').value = task.taskDescription || '';
+    document.getElementById('editTaskPriority').value = task.priority;
+    document.getElementById('editTaskStatus').value = task.status;
+
+    document.getElementById('editTaskModal').classList.add('active');
+}
+
+function deleteTaskById(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+    if (!confirm(`Delete task "${task.taskTitle}" by ${task.person}?`)) return;
+    tasks = tasks.filter(t => String(t.id) !== String(taskId));
+    saveToLocalStorage();
+    showToast('Task deleted', 'success');
+    applyFilters();
+    updateLogKPIs();
+}
+
+function closeEditTaskModal() {
+    document.getElementById('editTaskModal').classList.remove('active');
+    editingTaskId = null;
+}
+
+function saveEditedTask() {
+    const task = tasks.find(t => String(t.id) === String(editingTaskId));
+    if (task) {
+        task.taskTitle = document.getElementById('editTaskTitle').value;
+        task.taskDescription = document.getElementById('editTaskDescription').value;
+        task.priority = document.getElementById('editTaskPriority').value;
+        task.status = document.getElementById('editTaskStatus').value;
+        saveToLocalStorage();
+        showToast('Task updated', 'success');
+        closeEditTaskModal();
+        applyFilters();
+    }
+}
+
+function getFilteredTasks() {
+    const person = document.getElementById('filterPerson').value;
+    const project = document.getElementById('filterProject').value;
+    const status = document.getElementById('filterStatus').value;
+    const week = document.getElementById('filterWeek').value;
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+
+    return tasks.filter(t => {
+        if (person && t.person !== person) return false;
+        if (project && t.project !== project) return false;
+        if (status && t.status !== status) return false;
+        if (week && t.week !== week) return false;
+        if (search && !(t.taskTitle||'').toLowerCase().includes(search) && !(t.taskDescription||'').toLowerCase().includes(search) && !(t.comments||'').toLowerCase().includes(search)) return false;
+        return true;
+    });
+}
+
+function showBulkUpdate() {
+    const checked = document.querySelectorAll('.task-checkbox:checked');
+    const taskIds = Array.from(checked).map(c => c.dataset.taskId);
+
+    if (taskIds.length === 0) {
+        showToast('Select at least one task', 'error');
+        return;
+    }
+
+    if (confirm(`Mark ${taskIds.length} task(s) as Completed?`)) {
+        taskIds.forEach(id => {
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (task) task.status = 'Completed';
+        });
+        saveToLocalStorage();
+        showToast(`${taskIds.length} task(s) completed`, 'success');
+        applyFilters();
+    }
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAllCheckbox').checked;
+    document.querySelectorAll('.task-checkbox').forEach(cb => cb.checked = checked);
+}
+
+function exportFilteredTasks() {
+    const filtered = getFilteredTasks();
+    let csv = 'Person,Task Title,Project,Week,Priority,Status,Description,Comments\n';
+    filtered.forEach(t => {
+        csv += `"${t.person}","${t.taskTitle}","${t.project}","${t.week}","${t.priority}","${t.status}","${t.taskDescription}","${t.comments}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+}
+
+// ============ COMMENTS ============
+function openCommentModal(taskId) {
+    commentingTaskId = taskId;
+    const task = tasks.find(t => String(t.id) === String(taskId));
+
+    const list = document.getElementById('commentList');
+    list.innerHTML = (task.observerComments || []).map(c => `
+        <div class="comment-item">
+            <div class="comment-author">${c.author} <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span></div>
+            <div class="comment-text">${c.text}</div>
+        </div>
+    `).join('') || '<p style="color:#999; text-align:center;">No comments yet</p>';
+
+    document.getElementById('commentModal').classList.add('active');
+}
+
+function closeCommentModal() {
+    document.getElementById('commentModal').classList.remove('active');
+    commentingTaskId = null;
+    document.getElementById('commentInput').value = '';
+}
+
+function addComment() {
+    const text = document.getElementById('commentInput').value.trim();
+    if (!text) return;
+
+    const task = tasks.find(t => String(t.id) === String(commentingTaskId));
+    if (!task) return;
+
+    if (!task.observerComments) task.observerComments = [];
+    task.observerComments.push({
+        author: currentUser.name,
+        text,
+        timestamp: new Date().toISOString()
+    });
+
+    saveToLocalStorage();
+    showToast('Comment added', 'success');
+    document.getElementById('commentInput').value = '';
+    openCommentModal(commentingTaskId);
+}
+
+// ============ SETTINGS TAB ============
+function updateSettingsTab() {
+    updateTeamMembersSettings();
+    updateProjectsSettings();
+    updateCategoriesSettings();
+    updatePinSettings();
+}
+
+function updateTeamMembersSettings() {
+    const container = document.getElementById('teamMembersSettings');
+    const roleBadge = role => {
+        const colors = { admin: '#00aeef', member: '#00c4a0', observer: '#ffa94d' };
+        return `<span style="display:inline-block;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;color:white;background:${colors[role]||'#999'}">${role}</span>`;
+    };
+    container.innerHTML = users.map(u => `
+        <div class="list-item">
+            <div class="list-item-content">
+                <strong>${u.name}</strong> ${roleBadge(u.role)}
+            </div>
+            <div class="list-item-actions">
+                ${u.name !== currentUser.name ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.name.replace(/'/g, "\\'")}')">Remove</button>` : '<small style="color:#999">You</small>'}
+            </div>
+        </div>
+    `).join('');
+}
+
+function addTeamMember() {
+    const name = document.getElementById('newMemberName').value.trim();
+    const role = document.getElementById('newMemberRole').value;
+    const pin = document.getElementById('newMemberPin').value.trim();
+    if (!name) { showToast('Please enter a name', 'error'); return; }
+    if (!pin || pin.length !== 4) { showToast('PIN must be 4 digits', 'error'); return; }
+    if (users.find(u => u.name === name)) { showToast('User already exists', 'error'); return; }
+    users.push({ name, role, pin });
+    saveToLocalStorage();
+    showToast(`${name} added as ${role}`, 'success');
+    document.getElementById('newMemberName').value = '';
+    document.getElementById('newMemberPin').value = '';
+    updateTeamMembersSettings();
+    updatePinSettings();
+}
+
+function deleteUser(name) {
+    if (name === currentUser.name) { showToast("You can't remove yourself", 'error'); return; }
+    if (confirm(`Remove ${name}? Their tasks will remain.`)) {
+        users = users.filter(u => u.name !== name);
+        saveToLocalStorage();
+        showToast(`${name} removed`, 'success');
+        updateTeamMembersSettings();
+        updatePinSettings();
+    }
+}
+
+function updateProjectsSettings() {
+    const container = document.getElementById('projectsSettings');
+    container.innerHTML = projects.map(p => `
+        <div class="list-item">
+            <div class="list-item-content"><span class="project-tag" style="background-color: ${projectColors[p] || '#999'};">${p}</span></div>
+            <div class="list-item-actions">
+                <button class="btn btn-sm btn-danger" onclick="deleteProject('${p}')">Remove</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addProject() {
+    const name = document.getElementById('newProjectInput').value.trim();
+    if (!name) return;
+    if (projects.includes(name)) {
+        showToast('Project already exists', 'error');
+        return;
+    }
+    projects.push(name);
+    projectColors[name] = '#' + Math.floor(Math.random()*16777215).toString(16);
+    saveToLocalStorage();
+    document.getElementById('newProjectInput').value = '';
+    updateProjectsSettings();
+    showToast('Project added', 'success');
+}
+
+function deleteProject(name) {
+    if (confirm(`Remove project "${name}"?`)) {
+        projects = projects.filter(p => p !== name);
+        tasks = tasks.map(t => t.project === name ? { ...t, project: '' } : t);
+        saveToLocalStorage();
+        showToast('Project removed', 'success');
+        updateProjectsSettings();
+    }
+}
+
+function updateCategoriesSettings() {
+    const container = document.getElementById('categoriesSettings');
+    container.innerHTML = taskCategories.map(c => `
+        <div class="list-item">
+            <div class="list-item-content">${c}</div>
+            <div class="list-item-actions">
+                <button class="btn btn-sm btn-danger" onclick="deleteCategory('${c}')">Remove</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addCategory() {
+    const name = document.getElementById('newCategoryInput').value.trim();
+    if (!name) return;
+    if (taskCategories.includes(name)) {
+        showToast('Category already exists', 'error');
+        return;
+    }
+    taskCategories.push(name);
+    saveToLocalStorage();
+    document.getElementById('newCategoryInput').value = '';
+    updateCategoriesSettings();
+    showToast('Category added', 'success');
+}
+
+function deleteCategory(name) {
+    if (confirm(`Remove category "${name}"?`)) {
+        taskCategories = taskCategories.filter(c => c !== name);
+        saveToLocalStorage();
+        showToast('Category removed', 'success');
+        updateCategoriesSettings();
+    }
+}
+
+function updatePinSettings() {
+    const container = document.getElementById('pinSettings');
+    container.innerHTML = users.map(u => `
+        <div class="form-row">
+            <div class="form-field">
+                <label>${u.name}</label>
+                <input type="password" value="${u.pin}" readonly style="background:#f0f4f8;">
+            </div>
+            <div class="form-field">
+                <label>&nbsp;</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="password" id="newPin_${u.name}" placeholder="New PIN" maxlength="4" inputmode="numeric" style="flex: 1;">
+                    <button class="btn btn-sm btn-primary" onclick="changePIN('${u.name}')">Update</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function changePIN(name) {
+    const newPin = document.getElementById(`newPin_${name}`).value;
+    if (!newPin || newPin.length !== 4) {
+        showToast('PIN must be 4 digits', 'error');
+        return;
+    }
+    const user = users.find(u => u.name === name);
+    if (user) {
+        user.pin = newPin;
+        saveToLocalStorage();
+        showToast(`PIN updated for ${name}`, 'success');
+        document.getElementById(`newPin_${name}`).value = '';
+        updatePinSettings();
+    }
+}
+
+function exportCSV() {
+    let csv = 'Person,Task Title,Project,Week,Priority,Status,Description,Comments\n';
+    tasks.forEach(t => {
+        csv += `"${t.person}","${t.taskTitle}","${t.project}","${t.week}","${t.priority}","${t.status}","${t.taskDescription}","${t.comments}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    showToast('CSV exported', 'success');
+}
+
+function exportExcel() {
+    const ws = XLSX.utils.json_to_sheet(tasks.map(t => ({
+        Person: t.person,
+        'Task Title': t.taskTitle,
+        Project: t.project,
+        Week: t.week,
+        Priority: t.priority,
+        Status: t.status,
+        Description: t.taskDescription,
+        Comments: t.comments
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
+    XLSX.writeFile(wb, `tasks_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('Excel exported', 'success');
+}
+
+function importExcel() {
+    document.getElementById('excelFileInput').click();
+}
+
+function handleExcelImport() {
+    const file = document.getElementById('excelFileInput').files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const workbook = XLSX.read(e.target.result, { type: 'array' });
+            let importedCount = 0;
+
+            // Skip summary/utility sheets
+            const skipSheets = ['Lists', 'Sheet1', 'Team Summary', 'Project Breakdown', 'Weekly Activity'];
+
+            workbook.SheetNames.forEach(sheetName => {
+                if (skipSheets.includes(sheetName)) return;
+
+                const ws = workbook.Sheets[sheetName];
+                // Row 1 is a title row ("Name — Enter weekly tasks below..."), row 2 is the real header
+                // range:1 tells SheetJS to start from the second row (0-indexed)
+                const data = XLSX.utils.sheet_to_json(ws, { range: 1 });
+
+                const sheetPerson = users.find(u => u.name.includes(sheetName) || sheetName.includes(u.name.split(' ')[0]))?.name || sheetName;
+
+                data.forEach(row => {
+                    // Find the Week column (header may be "Week (e.g., 10–14 Nov 2025)" or just "Week")
+                    const weekKey = Object.keys(row).find(k => k.toLowerCase().startsWith('week'));
+                    const titleKey = Object.keys(row).find(k => k === 'Task Title');
+                    const descKey = Object.keys(row).find(k => k === 'Task Description');
+                    const commentKey = Object.keys(row).find(k => k.toLowerCase().includes('comment'));
+                    const weekVal = weekKey ? String(row[weekKey] || '') : '';
+                    const titleVal = titleKey ? String(row[titleKey] || '') : '';
+                    const descVal = descKey ? String(row[descKey] || '') : '';
+                    const commentVal = commentKey ? String(row[commentKey] || '') : '';
+
+                    if (weekVal && row.Project && titleVal) {
+                        const existingIndex = tasks.findIndex(t =>
+                            t.person === sheetPerson &&
+                            t.week === weekVal &&
+                            t.taskTitle === titleVal
+                        );
+
+                        const newTask = {
+                            id: existingIndex >= 0 ? tasks[existingIndex].id : String(Date.now() + Math.random()),
+                            person: sheetPerson,
+                            week: weekVal,
+                            project: row.Project || '',
+                            taskTitle: titleVal,
+                            taskDescription: descVal,
+                            priority: row.Priority || 'Medium',
+                            status: row.Status || 'Not Started',
+                            comments: commentVal,
+                            observerComments: existingIndex >= 0 ? tasks[existingIndex].observerComments : [],
+                            createdAt: existingIndex >= 0 ? tasks[existingIndex].createdAt : new Date().toISOString()
+                        };
+
+                        if (existingIndex >= 0) {
+                            tasks[existingIndex] = newTask;
+                        } else {
+                            tasks.push(newTask);
+                            importedCount++;
+                        }
+                    }
+                });
+            });
+
+            saveToLocalStorage();
+            showToast(`Imported ${importedCount} new task(s)`, 'success');
+            updateOverview();
+            applyFilters();
+        } catch (err) {
+            showToast('Import failed: ' + err.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function clearAllData() {
+    if (confirm('Clear ALL data? This cannot be undone!')) {
+        if (confirm('Are you absolutely sure?')) {
+            tasks = [];
+            saveToLocalStorage();
+            showToast('All data cleared', 'success');
+            updateOverview();
+            applyFilters();
+        }
+    }
+}
+
+// ============ STORAGE ============
+function saveToLocalStorage() {
+    const data = { tasks, projects, taskCategories, users, weeks, projectColors };
+    localStorage.setItem('chc_task_logger_v2', JSON.stringify(data));
+}
+
+function loadFromLocalStorage() {
+    const stored = localStorage.getItem('chc_task_logger_v2');
+    if (stored) {
+        try {
+            const data = JSON.parse(stored);
+            tasks = data.tasks || [];
+            projects = data.projects || projects;
+            taskCategories = data.taskCategories || taskCategories;
+            users = data.users || users;
+            weeks = data.weeks || weeks;
+            Object.assign(projectColors, data.projectColors || {});
+        } catch (err) {
+            console.error('Failed to load data:', err);
+        }
+    }
+}
+
+// ============ UTILITIES ============
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function initializeApp() {
+    initSpreadsheet();
+    updateTabBadges();
+}
+
+function updateTabBadges() {
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+
+    document.getElementById('badge-log-task').textContent = totalTasks;
+    document.getElementById('badge-overview').textContent = completedTasks;
+    document.getElementById('badge-all-tasks').textContent = totalTasks;
+}
+
+// ============ SYNC ENGINE (Offline-First + Google Sheets) ============
+
+// Set this to your deployed Google Apps Script Web App URL
+// Leave empty to run in offline-only mode (localStorage only)
+const SYNC_URL = '';
+
+let isOnline = navigator.onLine;
+let isSyncing = false;
+let pendingChanges = [];
+let lastSyncTime = null;
+
+// Load pending changes from localStorage
+function loadPendingChanges() {
+    try {
+        const stored = localStorage.getItem('chc_pending_changes');
+        pendingChanges = stored ? JSON.parse(stored) : [];
+    } catch { pendingChanges = []; }
+}
+
+function savePendingChanges() {
+    localStorage.setItem('chc_pending_changes', JSON.stringify(pendingChanges));
+}
+
+function queueChange(action, data) {
+    pendingChanges.push({
+        action,
+        data,
+        timestamp: new Date().toISOString()
+    });
+    savePendingChanges();
+    updateSyncIndicator();
+}
+
+// Override saveToLocalStorage to also queue sync
+const _originalSave = saveToLocalStorage;
+saveToLocalStorage = function() {
+    _originalSave();
+    // Auto-sync if online and configured
+    if (SYNC_URL && isOnline && !isSyncing) {
+        clearTimeout(window._syncDebounce);
+        window._syncDebounce = setTimeout(() => syncToServer(), 2000);
+    }
+};
+
+async function syncToServer() {
+    if (!SYNC_URL || isSyncing) return;
+
+    isSyncing = true;
+    updateSyncIndicator();
+
+    try {
+        // Send full state for sync
+        const response = await fetch(SYNC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'fullSync',
+                tasks: tasks.map(t => ({
+                    ...t,
+                    updatedAt: t.updatedAt || t.createdAt || new Date().toISOString()
+                })),
+                users: currentUser && currentUser.role === 'admin' ? users : []
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'ok') {
+            // Merge server state back
+            if (result.tasks) {
+                const serverMap = {};
+                result.tasks.forEach(t => serverMap[t.id] = t);
+                const localMap = {};
+                tasks.forEach(t => localMap[t.id] = t);
+
+                // Add server-only tasks to local
+                result.tasks.forEach(st => {
+                    if (!localMap[st.id]) {
+                        tasks.push(st);
+                    }
+                });
+
+                _originalSave();
+            }
+
+            // Clear pending changes
+            pendingChanges = [];
+            savePendingChanges();
+
+            lastSyncTime = new Date();
+            localStorage.setItem('chc_last_sync', lastSyncTime.toISOString());
+
+            showToast('Synced with server', 'success');
+        } else {
+            console.error('Sync error:', result.message);
+            showToast('Sync failed: ' + result.message, 'error');
+        }
+    } catch (err) {
+        console.error('Sync network error:', err);
+        // Don't show error toast for every failed attempt — just update indicator
+    }
+
+    isSyncing = false;
+    updateSyncIndicator();
+}
+
+async function manualSync() {
+    if (!SYNC_URL) {
+        showToast('No sync server configured. Set SYNC_URL in the code or see the setup guide.', 'error');
+        return;
+    }
+    if (!isOnline) {
+        showToast('You are offline. Changes will sync when you reconnect.', 'error');
+        return;
+    }
+    await syncToServer();
+}
+
+function updateSyncIndicator() {
+    const indicator = document.getElementById('syncIndicator');
+    const icon = document.getElementById('syncIcon');
+    const text = document.getElementById('syncText');
+    if (!indicator) return;
+
+    // Remove all state classes
+    indicator.classList.remove('online', 'offline', 'syncing', 'error');
+
+    if (!SYNC_URL) {
+        indicator.classList.add('offline');
+        icon.innerHTML = '&#x1f4be;';  // floppy disk
+        text.innerHTML = 'Local Only';
+        return;
+    }
+
+    if (isSyncing) {
+        indicator.classList.add('syncing');
+        icon.innerHTML = '&#x21bb;';  // arrows
+        text.innerHTML = 'Syncing...';
+        return;
+    }
+
+    if (!isOnline) {
+        indicator.classList.add('offline');
+        icon.innerHTML = '&#x2601;';  // cloud
+        const pending = pendingChanges.length;
+        text.innerHTML = 'Offline' + (pending > 0 ? ` <span class="pending-count">${pending}</span>` : '');
+        return;
+    }
+
+    // Online and not syncing
+    const pending = pendingChanges.length;
+    if (pending > 0) {
+        indicator.classList.add('error');
+        icon.innerHTML = '&#x2601;';
+        text.innerHTML = `${pending} pending`;
+    } else {
+        indicator.classList.add('online');
+        icon.innerHTML = '&#x2713;';  // checkmark
+        const ago = lastSyncTime ? timeSince(lastSyncTime) : 'never';
+        text.innerHTML = `Synced ${ago}`;
+    }
+}
+
+function timeSince(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+}
+
+// Network status listeners
+window.addEventListener('online', () => {
+    isOnline = true;
+    updateSyncIndicator();
+    showToast('Back online — syncing...', 'success');
+    if (SYNC_URL) syncToServer();
+});
+
+window.addEventListener('offline', () => {
+    isOnline = false;
+    updateSyncIndicator();
+    showToast('You are offline. Changes saved locally.', 'error');
+});
+
+// Periodic sync indicator update (for "synced Xm ago" text)
+setInterval(updateSyncIndicator, 30000);
+
+// Register Service Worker for offline app caching
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+        console.log('Service Worker registered:', reg.scope);
+    }).catch(err => {
+        console.warn('Service Worker registration failed:', err);
+    });
+}
+
+// Load sync state
+loadPendingChanges();
+try {
+    const ls = localStorage.getItem('chc_last_sync');
+    if (ls) lastSyncTime = new Date(ls);
+} catch {}
+
+init();
+</script>
+
+</body>
+</html>
