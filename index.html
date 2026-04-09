@@ -1277,6 +1277,7 @@
                         <th style="width: 30px;" id="bulkCheckHeader"><input type="checkbox" class="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th>
                         <th>Person</th>
                         <th>Task Title</th>
+                        <th>Description</th>
                         <th>Project</th>
                         <th>Week</th>
                         <th>Priority</th>
@@ -1434,6 +1435,7 @@ let users = [
     { name: 'Mahmoud Mardini', role: 'admin', pin: '1234' },
     { name: 'Konstantinos Roussos', role: 'member', pin: '1234' },
     { name: 'Andreas Livadiotis', role: 'member', pin: '1234' },
+    { name: 'Chris Dimitriou', role: 'member', pin: '1234' },
     { name: 'Dante Abate', role: 'observer', pin: '1234' },
     { name: 'Christodoulos Mettas', role: 'observer', pin: '1234' }
 ];
@@ -1485,19 +1487,39 @@ function init() {
     const pinEl = document.getElementById('pinInput');
     if (pinEl) pinEl.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
 
-    // Restore session if previously logged in
-    try {
-        const savedSession = localStorage.getItem('chc_current_user');
-        if (savedSession) {
-            const sessionData = JSON.parse(savedSession);
-            const user = users.find(u => u.name === sessionData.name);
-            if (user) {
-                currentUser = user;
-                transitionToApp();
-                return;
+    // Pull latest data from server BEFORE restoring session
+    // This ensures PINs, tasks, etc. are up-to-date on every device
+    pullFromServer().then(() => {
+        // Re-populate dropdown in case users changed from server
+        userSelect.innerHTML = '<option value="">— Select your name —</option>' + users.map(u => `<option value="${u.name}">${u.name}${u.role === 'observer' ? ' (Observer)' : ''}</option>`).join('');
+
+        // Restore session if previously logged in
+        try {
+            const savedSession = localStorage.getItem('chc_current_user');
+            if (savedSession) {
+                const sessionData = JSON.parse(savedSession);
+                const user = users.find(u => u.name === sessionData.name);
+                if (user) {
+                    currentUser = user;
+                    transitionToApp();
+                    return;
+                }
             }
-        }
-    } catch (e) { console.warn('Session restore failed:', e); }
+        } catch (e) { console.warn('Session restore failed:', e); }
+    }).catch(() => {
+        // If pull fails (offline), still try to restore session from local data
+        try {
+            const savedSession = localStorage.getItem('chc_current_user');
+            if (savedSession) {
+                const sessionData = JSON.parse(savedSession);
+                const user = users.find(u => u.name === sessionData.name);
+                if (user) {
+                    currentUser = user;
+                    transitionToApp();
+                }
+            }
+        } catch (e) { console.warn('Session restore failed:', e); }
+    });
 }
 
 function generateWeekRanges() {
@@ -1570,11 +1592,16 @@ function handleLogin() {
         return;
     }
 
-    const user = users.find(u => u.name === name && u.pin === pin);
-    if (!user) {
-        showToast('Invalid name or PIN', 'error');
+    const userByName = users.find(u => u.name === name);
+    if (!userByName) {
+        showToast('User not found', 'error');
         return;
     }
+    if (userByName.pin !== pin) {
+        showToast('Wrong password. Please try again.', 'error');
+        return;
+    }
+    const user = userByName;
 
     currentUser = user;
     // Save session for persistence across refresh
@@ -2377,7 +2404,7 @@ function applyFilters() {
 
     const tbody = document.getElementById('allTasksBody');
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:#999;">No tasks match your filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:#999;">No tasks match your filters</td></tr>';
         return;
     }
 
@@ -2398,6 +2425,7 @@ function applyFilters() {
                     ${currentUser.role === 'admin' ? `<td><input type="checkbox" class="checkbox task-checkbox" data-task-id="${safeId}"></td>` : ''}
                     <td>${task.person || ''}</td>
                     <td>${task.taskTitle || ''}</td>
+                    <td style="font-size:12px;color:#6b7b8d;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(task.taskDescription||'').replace(/"/g,'&quot;')}">${task.taskDescription || ''}</td>
                     <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${task.project || ''}</span></td>
                     <td>${task.week || ''}</td>
                     <td><span class="priority-${priority.toLowerCase()}">${priority}</span></td>
@@ -3018,6 +3046,69 @@ async function syncToServer() {
     updateSyncIndicator();
 }
 
+async function pullFromServer() {
+    if (!SYNC_URL || !isOnline) return;
+
+    try {
+        const response = await fetch(SYNC_URL + '?action=getAll');
+        const result = await response.json();
+
+        if (result.status === 'ok') {
+            let changed = false;
+
+            // Merge server tasks into local
+            if (result.tasks && result.tasks.length > 0) {
+                const localMap = {};
+                tasks.forEach(t => localMap[t.id] = t);
+
+                result.tasks.forEach(st => {
+                    const local = localMap[st.id];
+                    if (!local) {
+                        // New task from server — add locally
+                        tasks.push(st);
+                        changed = true;
+                    } else {
+                        // Task exists locally — server wins if newer
+                        const serverTime = new Date(st.updatedAt || st.createdAt || 0).getTime();
+                        const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
+                        if (serverTime > localTime) {
+                            Object.assign(local, st);
+                            changed = true;
+                        }
+                    }
+                });
+            }
+
+            // Merge server users (PINs, roles) into local
+            if (result.users && result.users.length > 0) {
+                result.users.forEach(su => {
+                    const local = users.find(u => u.name === su.name);
+                    if (local) {
+                        if (su.pin && su.pin !== local.pin) { local.pin = su.pin; changed = true; }
+                        if (su.role && su.role !== local.role) { local.role = su.role; changed = true; }
+                    }
+                });
+            }
+
+            if (changed) {
+                _originalSave();
+                // Refresh UI if app is active
+                if (currentUser) {
+                    applyFilters();
+                    updateOverview();
+                    updateTabBadges();
+                }
+            }
+
+            lastSyncTime = new Date();
+            localStorage.setItem('chc_last_sync', lastSyncTime.toISOString());
+            updateSyncIndicator();
+        }
+    } catch (err) {
+        console.warn('Pull from server failed:', err);
+    }
+}
+
 async function manualSync() {
     if (!SYNC_URL) {
         showToast('No sync server configured. Set SYNC_URL in the code or see the setup guide.', 'error');
@@ -3088,7 +3179,9 @@ window.addEventListener('online', () => {
     isOnline = true;
     updateSyncIndicator();
     showToast('Back online — syncing...', 'success');
-    if (SYNC_URL) syncToServer();
+    if (SYNC_URL) {
+        pullFromServer().then(() => syncToServer());
+    }
 });
 
 window.addEventListener('offline', () => {
@@ -3099,6 +3192,13 @@ window.addEventListener('offline', () => {
 
 // Periodic sync indicator update (for "synced Xm ago" text)
 setInterval(updateSyncIndicator, 30000);
+
+// Periodic pull from server (every 60 seconds) to keep data fresh across devices
+setInterval(() => {
+    if (SYNC_URL && isOnline && !isSyncing) {
+        pullFromServer();
+    }
+}, 60000);
 
 // Register Service Worker for offline app caching
 if ('serviceWorker' in navigator) {
