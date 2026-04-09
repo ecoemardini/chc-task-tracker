@@ -3003,12 +3003,9 @@ async function syncToServer() {
 
     try {
         // Send full state for sync (timeout after 15 seconds)
-        const controller = new AbortController();
-        const syncTimeout = setTimeout(() => controller.abort(), 15000);
-        const response = await fetch(SYNC_URL, {
+        const syncFetch = fetch(SYNC_URL, {
             method: 'POST',
             redirect: 'follow',
-            signal: controller.signal,
             body: JSON.stringify({
                 action: 'fullSync',
                 tasks: tasks.map(t => ({
@@ -3018,7 +3015,8 @@ async function syncToServer() {
                 users: users
             })
         });
-        clearTimeout(syncTimeout);
+        const syncTimeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 15000));
+        const response = await Promise.race([syncFetch, syncTimeoutPromise]);
 
         const result = await response.json();
 
@@ -3078,10 +3076,9 @@ async function pullFromServer() {
 
     try {
         // Timeout after 10 seconds to prevent hanging
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        const response = await fetch(SYNC_URL + '?action=getAll', { redirect: 'follow', signal: controller.signal });
-        clearTimeout(timeout);
+        const fetchPromise = fetch(SYNC_URL + '?action=getAll', { redirect: 'follow' });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Pull timeout')), 10000));
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
         const result = await response.json();
 
         if (result.status === 'ok') {
