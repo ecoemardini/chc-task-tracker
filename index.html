@@ -752,7 +752,7 @@
             box-shadow: var(--shadow-lg);
             font-size: 14px;
             font-weight: 500;
-            z-index: 9998;
+            z-index: 10000;
             animation: slideIn 0.3s ease, slideOut 0.3s ease 2.7s;
             border-left: 4px solid var(--primary-blue);
         }
@@ -1267,6 +1267,7 @@
             </div>
 
             <div class="button-group">
+                <button class="btn btn-secondary" onclick="clearAllFilters()" style="background:#e0e7f1;color:var(--dark-navy);">Clear Filters</button>
                 <button class="btn btn-secondary" id="exportFilteredBtn" onclick="exportFilteredTasks()">Export Filtered</button>
                 <button class="btn btn-secondary" id="bulkUpdateBtn" onclick="showBulkUpdate()" style="display:none;">Mark Selected as Completed</button>
             </div>
@@ -2382,6 +2383,15 @@ function populateFilterSelects() {
     document.getElementById('filterWeek').innerHTML = '<option value="">All Weeks</option>' + weeksUsed.map(w => `<option value="${w}">${w}</option>`).join('');
 }
 
+function clearAllFilters() {
+    document.getElementById('filterPerson').value = '';
+    document.getElementById('filterProject').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterWeek').value = '';
+    document.getElementById('globalSearch').value = '';
+    applyFilters();
+}
+
 function applyFilters() {
     const person = document.getElementById('filterPerson').value;
     const project = document.getElementById('filterProject').value;
@@ -2770,9 +2780,9 @@ function changePIN(name) {
     const user = users.find(u => u.name === name);
     if (user) {
         user.pin = newPin;
-        saveToLocalStorage();
-        // Force immediate sync so PIN changes propagate to other devices
-        if (SYNC_URL && isOnline) syncToServer();
+        _originalSave();
+        // Sync PIN change to server (single sync, no debounce loop)
+        if (SYNC_URL && isOnline && !isSyncing) syncToServer();
         showToast(`PIN updated for ${name}`, 'success');
         document.getElementById(`newPin_${name}`).value = '';
         updatePinSettings();
@@ -3038,16 +3048,17 @@ async function syncToServer() {
                 _originalSave();
             }
 
-            // Merge user data (PINs, roles) from server
+            // Merge user data (PINs, roles) from server — only if actually different
             if (result.users && result.users.length > 0) {
+                let usersChanged = false;
                 result.users.forEach(su => {
                     const local = users.find(u => u.name === su.name);
                     if (local) {
-                        local.pin = String(su.pin || local.pin);
-                        local.role = su.role || local.role;
+                        if (su.pin && String(su.pin) !== String(local.pin)) { local.pin = String(su.pin); usersChanged = true; }
+                        if (su.role && su.role !== local.role) { local.role = su.role; usersChanged = true; }
                     }
                 });
-                _originalSave();
+                if (usersChanged) _originalSave();
             }
 
             // Clear pending changes
