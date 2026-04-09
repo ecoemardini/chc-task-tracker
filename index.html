@@ -1612,7 +1612,7 @@ function handleLogin() {
         showToast('User not found', 'error');
         return;
     }
-    if (userByName.pin !== pin) {
+    if (String(userByName.pin) !== String(pin)) {
         showToast('Wrong password. Please try again.', 'error');
         return;
     }
@@ -3051,7 +3051,7 @@ async function syncToServer() {
                 result.users.forEach(su => {
                     const local = users.find(u => u.name === su.name);
                     if (local) {
-                        local.pin = su.pin || local.pin;
+                        local.pin = String(su.pin || local.pin);
                         local.role = su.role || local.role;
                     }
                 });
@@ -3117,7 +3117,7 @@ async function pullFromServer() {
                 result.users.forEach(su => {
                     const local = users.find(u => u.name === su.name);
                     if (local) {
-                        if (su.pin && su.pin !== local.pin) { local.pin = su.pin; changed = true; }
+                        if (su.pin && String(su.pin) !== String(local.pin)) { local.pin = String(su.pin); changed = true; }
                         if (su.role && su.role !== local.role) { local.role = su.role; changed = true; }
                     }
                 });
