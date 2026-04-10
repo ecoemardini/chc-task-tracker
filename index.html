@@ -2484,6 +2484,7 @@ function deleteTaskById(taskId) {
     const task = tasks.find(t => String(t.id) === String(taskId));
     if (!task) return;
     if (!confirm(`Delete task "${task.taskTitle}" by ${task.person}?`)) return;
+    addTombstone(taskId);
     tasks = tasks.filter(t => String(t.id) !== String(taskId));
     saveToLocalStorage();
     showToast('Task deleted', 'success');
@@ -2906,6 +2907,8 @@ function handleExcelImport() {
 function clearAllData() {
     if (confirm('Clear ALL data? This cannot be undone!')) {
         if (confirm('Are you absolutely sure?')) {
+            // Tombstone every existing task so deletions propagate to the server
+            tasks.forEach(t => { if (t && t.id !== undefined) addTombstone(t.id); });
             tasks = [];
             saveToLocalStorage();
             showToast('All data cleared', 'success');
@@ -2972,6 +2975,50 @@ let isSyncing = false;
 let pendingChanges = [];
 let lastSyncTime = null;
 
+// ---------- Tombstones (deletion propagation) ----------
+// Tracks task IDs that were deleted locally so we can tell the server
+// to delete them and prevent them from being re-added by subsequent syncs.
+// Format: [{ id: "task-123", deletedAt: "2026-04-10T12:34:56.000Z" }]
+let tombstones = [];
+const TOMBSTONE_TTL_DAYS = 14; // keep tombstones for 14 days after deletion
+
+function loadTombstones() {
+    try {
+        const stored = localStorage.getItem('chc_tombstones');
+        tombstones = stored ? JSON.parse(stored) : [];
+    } catch { tombstones = []; }
+    pruneOldTombstones();
+}
+
+function saveTombstones() {
+    localStorage.setItem('chc_tombstones', JSON.stringify(tombstones));
+}
+
+function addTombstone(id) {
+    if (id === undefined || id === null || id === '') return;
+    const sid = String(id);
+    // Dedupe — if already tombstoned, just refresh timestamp
+    tombstones = tombstones.filter(t => String(t.id) !== sid);
+    tombstones.push({ id: sid, deletedAt: new Date().toISOString() });
+    saveTombstones();
+}
+
+function isTombstoned(id) {
+    if (id === undefined || id === null || id === '') return false;
+    const sid = String(id);
+    return tombstones.some(t => String(t.id) === sid);
+}
+
+function pruneOldTombstones() {
+    const cutoff = Date.now() - TOMBSTONE_TTL_DAYS * 24 * 60 * 60 * 1000;
+    const before = tombstones.length;
+    tombstones = tombstones.filter(t => {
+        const dt = new Date(t.deletedAt || 0).getTime();
+        return dt > cutoff;
+    });
+    if (tombstones.length !== before) saveTombstones();
+}
+
 // Load pending changes from localStorage
 function loadPendingChanges() {
     try {
@@ -3012,6 +3059,8 @@ async function syncToServer() {
     updateSyncIndicator();
 
     try {
+        pruneOldTombstones();
+        const tombstoneSnapshot = tombstones.slice(); // capture what we're sending
         // Send full state for sync (timeout after 15 seconds)
         const syncFetch = fetch(SYNC_URL, {
             method: 'POST',
@@ -3022,7 +3071,8 @@ async function syncToServer() {
                     ...t,
                     updatedAt: t.updatedAt || t.createdAt || new Date().toISOString()
                 })),
-                users: users
+                users: users,
+                tombstones: tombstoneSnapshot
             })
         });
         const syncTimeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 15000));
@@ -3031,19 +3081,29 @@ async function syncToServer() {
         const result = await response.json();
 
         if (result.status === 'ok') {
-            // Merge server state back
+            // Merge server state back — but NEVER re-add locally tombstoned tasks
             if (result.tasks) {
-                const serverMap = {};
-                result.tasks.forEach(t => serverMap[t.id] = t);
                 const localMap = {};
                 tasks.forEach(t => localMap[t.id] = t);
 
-                // Add server-only tasks to local
+                // Add server-only tasks to local, unless tombstoned
                 result.tasks.forEach(st => {
+                    if (isTombstoned(st.id)) return; // skip deleted
                     if (!localMap[st.id]) {
                         tasks.push(st);
                     }
                 });
+
+                // Drop any local tasks that the server confirms are gone
+                // (server returns only non-deleted tasks, so anything in our
+                // tombstone list that the server also doesn't have is safe to clear)
+                const serverIds = new Set(result.tasks.map(t => String(t.id)));
+                const confirmedTombstones = tombstoneSnapshot.filter(t => !serverIds.has(String(t.id)));
+                if (confirmedTombstones.length > 0) {
+                    const confirmedIds = new Set(confirmedTombstones.map(t => String(t.id)));
+                    tombstones = tombstones.filter(t => !confirmedIds.has(String(t.id)));
+                    saveTombstones();
+                }
 
                 _originalSave();
             }
@@ -3095,12 +3155,17 @@ async function pullFromServer() {
         if (result.status === 'ok') {
             let changed = false;
 
-            // Merge server tasks into local
+            // Merge server tasks into local — skip anything we've tombstoned locally
             if (result.tasks && result.tasks.length > 0) {
+                pruneOldTombstones();
                 const localMap = {};
                 tasks.forEach(t => localMap[t.id] = t);
 
                 result.tasks.forEach(st => {
+                    // If user deleted this locally, don't resurrect it — the
+                    // next syncToServer() will push the tombstone to the server.
+                    if (isTombstoned(st.id)) return;
+
                     const local = localMap[st.id];
                     if (!local) {
                         // New task from server — add locally
@@ -3250,6 +3315,7 @@ if ('serviceWorker' in navigator) {
 
 // Load sync state
 loadPendingChanges();
+loadTombstones();
 try {
     const ls = localStorage.getItem('chc_last_sync');
     if (ls) lastSyncTime = new Date(ls);
