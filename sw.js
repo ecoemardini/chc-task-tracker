@@ -18,6 +18,7 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(ASSETS_TO_CACHE).catch(err => {
         console.warn('Some assets failed to cache:', err);
+        // Cache what we can, don't fail the install
         return Promise.allSettled(
           ASSETS_TO_CACHE.map(url => cache.add(url).catch(() => {}))
         );
@@ -42,12 +43,16 @@ self.addEventListener('activate', event => {
 // Fetch: serve from cache, fallback to network
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  // Don't cache Google Apps Script API calls
   if (url.hostname === 'script.google.com' || url.hostname === 'script.googleusercontent.com') {
     return;
   }
+
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) {
+        // Return cache, but also fetch in background to update cache
         event.waitUntil(
           fetch(event.request).then(response => {
             if (response.ok) {
@@ -58,12 +63,14 @@ self.addEventListener('fetch', event => {
         return cached;
       }
       return fetch(event.request).then(response => {
+        // Cache successful responses
         if (response.ok && event.request.method === 'GET') {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
         }
         return response;
       }).catch(() => {
+        // Offline and not in cache
         if (event.request.destination === 'document') {
           return caches.match('./index.html');
         }
@@ -72,6 +79,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// Listen for sync messages from the main app
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
