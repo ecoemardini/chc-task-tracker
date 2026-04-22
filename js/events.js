@@ -207,7 +207,10 @@ function showEventDetail(id) {
         ${locationLine}
         ${projectLine}
         <p style="font-size:11px;color:var(--text-dim);margin-top:12px;">Added by ${evt.createdBy || 'unknown'}</p>
-        ${canDel ? `<button class="btn btn-danger btn-sm" style="margin-top:12px;" onclick="deleteEvent('${evt.id}'); closeEventDetailModal();">Delete Event</button>` : ''}
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            ${canDel ? `<button class="btn btn-primary btn-sm" onclick="openEditEventModal('${evt.id}'); closeEventDetailModal();">Edit</button>` : ''}
+            ${canDel ? `<button class="btn btn-danger btn-sm" onclick="deleteEvent('${evt.id}'); closeEventDetailModal();">Delete</button>` : ''}
+        </div>
     `;
     document.getElementById('eventDetailModal').classList.add('active');
 }
@@ -216,8 +219,10 @@ function closeEventDetailModal() {
     document.getElementById('eventDetailModal').classList.remove('active');
 }
 
-// --- Add Event Modal ---
-function openAddEventModal() {
+// --- Add / Edit Event Modal ---
+let editingEventId = null;
+
+function _populateEventModal() {
     const personSelect = document.getElementById('eventPerson');
     personSelect.innerHTML = users.filter(u => u.role !== 'observer')
         .map(u => `<option value="${u.name}" ${u.name === currentUser.name ? 'selected' : ''}>${u.name}</option>`)
@@ -226,21 +231,46 @@ function openAddEventModal() {
     const projectSelect = document.getElementById('eventProject');
     projectSelect.innerHTML = '<option value="">— None —</option>' +
         projects.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+
+function openAddEventModal() {
+    editingEventId = null;
+    _populateEventModal();
 
     const today = new Date();
     document.getElementById('eventStartDate').value = toDateStr(today);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
     document.getElementById('eventEndDate').value = toDateStr(tomorrow);
-
     document.getElementById('eventTitle').value = '';
     document.getElementById('eventLocation').value = '';
 
+    document.getElementById('eventModalHeader').textContent = 'Add Event';
+    document.getElementById('eventSaveBtn').textContent = 'Add Event';
+    document.getElementById('addEventModal').classList.add('active');
+}
+
+function openEditEventModal(id) {
+    const evt = events.find(e => e.id === id);
+    if (!evt) return;
+    editingEventId = id;
+    _populateEventModal();
+
+    document.getElementById('eventTitle').value = evt.title || '';
+    document.getElementById('eventPerson').value = evt.person;
+    document.getElementById('eventStartDate').value = evt.startDate;
+    document.getElementById('eventEndDate').value = evt.endDate;
+    document.getElementById('eventLocation').value = evt.location || '';
+    document.getElementById('eventProject').value = evt.project || '';
+
+    document.getElementById('eventModalHeader').textContent = 'Edit Event';
+    document.getElementById('eventSaveBtn').textContent = 'Save Changes';
     document.getElementById('addEventModal').classList.add('active');
 }
 
 function closeAddEventModal() {
     document.getElementById('addEventModal').classList.remove('active');
+    editingEventId = null;
 }
 
 function saveNewEvent() {
@@ -255,9 +285,25 @@ function saveNewEvent() {
     if (!startDate || !endDate) { showToast('Please select start and end dates', 'error'); return; }
     if (new Date(endDate) < new Date(startDate)) { showToast('End date must be after start date', 'error'); return; }
 
-    addEvent({ title, person, startDate, endDate, location, project, createdBy: currentUser.name });
+    if (editingEventId) {
+        // Update existing event
+        const evt = events.find(e => e.id === editingEventId);
+        if (evt) {
+            evt.title = title;
+            evt.person = person;
+            evt.startDate = startDate;
+            evt.endDate = endDate;
+            evt.location = location;
+            evt.project = project;
+            saveEventsToLocalStorage();
+            renderCalendar();
+            showToast('Event updated', 'success');
+        }
+    } else {
+        addEvent({ title, person, startDate, endDate, location, project, createdBy: currentUser.name });
+        showToast('Event added', 'success');
+    }
     closeAddEventModal();
-    showToast('Event added', 'success');
 }
 
 // --- Helpers ---
