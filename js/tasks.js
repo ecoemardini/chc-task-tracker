@@ -1,0 +1,597 @@
+// ============ TASK MANAGEMENT ============
+// Log Task spreadsheet, All Tasks table, filters, CRUD, comments.
+// Includes role-based permission enforcement.
+
+// --- Permission Helpers ---
+function canEditTask(task) {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    return task.person === currentUser.name;
+}
+
+function canDeleteTask(task) {
+    if (!currentUser) return false;
+    return currentUser.role === 'admin';
+}
+
+// --- Task ID Generation ---
+function newTaskId() {
+    const rand = Math.random().toString(36).slice(2, 10);
+    return 't-' + Date.now().toString(36) + '-' + rand;
+}
+
+// --- Log Task Spreadsheet ---
+function initSpreadsheet() {
+    const tbody = document.getElementById('spreadsheetBody');
+    tbody.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        addSpreadsheetRow(true);
+    }
+    updateRecentTasks();
+    updateLogKPIs();
+}
+
+function addSpreadsheetRow(silent = false) {
+    const tbody = document.getElementById('spreadsheetBody');
+    const rowNum = tbody.children.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td class="row-number">${rowNum}</td>
+        <td>
+            <select class="personSelect">
+                ${currentUser.role === 'member' ? `<option value="${currentUser.name}">${currentUser.name}</option>` : `<option value="">Select...</option>${users.map(u => `<option value="${u.name}">${u.name}</option>`).join('')}`}
+            </select>
+        </td>
+        <td>
+            <div class="combobox-container">
+                <input type="text" class="weekInput combobox-input" placeholder="Select week..." data-list="weeks">
+                <div class="combobox-dropdown" style="display:none;"></div>
+            </div>
+        </td>
+        <td>
+            <select class="projectSelect">
+                <option value="">Select...</option>
+                ${projects.map(p => `<option value="${p}">${p}</option>`).join('')}
+            </select>
+        </td>
+        <td>
+            <div class="combobox-container">
+                <input type="text" class="titleInput combobox-input" placeholder="Search/type..." data-list="categories">
+                <div class="combobox-dropdown" style="display:none;"></div>
+            </div>
+        </td>
+        <td><textarea style="height: 40px;" class="descInput" placeholder="Describe..."></textarea></td>
+        <td>
+            <select class="prioritySelect">
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+            </select>
+        </td>
+        <td>
+            <select class="statusSelect">
+                <option value="Not Started">Not Started</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+            </select>
+        </td>
+        <td><input type="text" class="commentInput" placeholder="Notes..."></td>
+        <td>
+            <div class="action-buttons">
+                <button class="btn btn-sm btn-primary" onclick="duplicateRow(this)">Dup</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteRow(this)">Del</button>
+            </div>
+        </td>
+    `;
+    tbody.appendChild(row);
+
+    // Auto-fill week on every new row
+    row.querySelector('.weekInput').value = getCurrentWeek();
+
+    // Auto-set user for members (enforce: members can only add tasks for themselves)
+    if (currentUser.role === 'member') {
+        row.querySelector('.personSelect').value = currentUser.name;
+    }
+
+    initCombobox(row.querySelector('.weekInput'), weeks);
+    initCombobox(row.querySelector('.titleInput'), taskCategories);
+
+    const lastInput = row.querySelector('.commentInput');
+    lastInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+            saveAllTasks();
+            addSpreadsheetRow();
+        }
+    });
+}
+
+function duplicateRow(btn) {
+    const row = btn.closest('tr');
+    const tbody = row.parentElement;
+    const newRow = row.cloneNode(true);
+    newRow.querySelector('.titleInput').value = '';
+    newRow.querySelector('.descInput').value = '';
+    tbody.insertBefore(newRow, row.nextSibling);
+    initCombobox(newRow.querySelector('.weekInput'), weeks);
+    initCombobox(newRow.querySelector('.titleInput'), taskCategories);
+    updateRowNumbers();
+}
+
+function deleteRow(btn) {
+    btn.closest('tr').remove();
+    updateRowNumbers();
+}
+
+function updateRowNumbers() {
+    const rows = document.querySelectorAll('#spreadsheetBody tr');
+    rows.forEach((row, idx) => {
+        row.querySelector('.row-number').textContent = idx + 1;
+    });
+}
+
+// --- Combobox ---
+function initCombobox(input, options) {
+    const container = input.parentElement;
+    const dropdown = container.querySelector('.combobox-dropdown');
+    let highlightedIndex = -1;
+
+    function showDropdown(filter = '') {
+        const filtered = options.filter(o => o.toLowerCase().includes(filter.toLowerCase()));
+        if (filtered.length === 0) { dropdown.style.display = 'none'; return; }
+        dropdown.innerHTML = filtered.map(o => `<div class="combobox-option">${o}</div>`).join('');
+        dropdown.style.display = 'block';
+        highlightedIndex = -1;
+        dropdown.querySelectorAll('.combobox-option').forEach(opt => {
+            opt.addEventListener('mousedown', () => {
+                input.value = opt.textContent;
+                dropdown.style.display = 'none';
+            });
+        });
+    }
+
+    input.addEventListener('focus', () => showDropdown(input.value));
+    input.addEventListener('input', () => showDropdown(input.value));
+    input.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none'; }, 200));
+
+    input.addEventListener('keydown', e => {
+        const items = dropdown.querySelectorAll('.combobox-option');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
+            updateHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlightedIndex = Math.max(highlightedIndex - 1, 0);
+            updateHighlight();
+        } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+            e.preventDefault();
+            input.value = items[highlightedIndex].textContent;
+            dropdown.style.display = 'none';
+        } else if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    function updateHighlight() {
+        const items = dropdown.querySelectorAll('.combobox-option');
+        items.forEach((item, idx) => {
+            item.classList.toggle('highlighted', idx === highlightedIndex);
+        });
+    }
+}
+
+// --- Save All Tasks ---
+let _saveInFlight = false;
+function saveAllTasks() {
+    if (_saveInFlight) return;
+    _saveInFlight = true;
+
+    try {
+        const rows = document.querySelectorAll('#spreadsheetBody tr');
+        const saved = [];
+        const skipped = [];
+
+        rows.forEach(row => {
+            const person = row.querySelector('.personSelect').value;
+            const week = row.querySelector('.weekInput').value;
+            const project = row.querySelector('.projectSelect').value;
+            const title = row.querySelector('.titleInput').value;
+            const desc = row.querySelector('.descInput').value;
+            const priority = row.querySelector('.prioritySelect').value;
+            const status = row.querySelector('.statusSelect').value;
+            const comments = row.querySelector('.commentInput').value;
+
+            const isBlank = !person && !week && !project && !title && !desc && !comments;
+            if (isBlank) return;
+
+            if (!person || !week || !project || !title) {
+                skipped.push(row);
+                return;
+            }
+
+            // Enforce: members can only add tasks for themselves
+            if (currentUser.role === 'member' && person !== currentUser.name) {
+                showToast(`You can only add tasks for yourself`, 'error');
+                skipped.push(row);
+                return;
+            }
+
+            const now = new Date().toISOString();
+            tasks.push({
+                id: newTaskId(),
+                person,
+                week,
+                project,
+                taskTitle: title,
+                taskDescription: desc,
+                priority,
+                status,
+                comments,
+                observerComments: [],
+                createdAt: now,
+                updatedAt: now
+            });
+            saved.push(row);
+        });
+
+        if (saved.length === 0 && skipped.length === 0) {
+            showToast('Nothing to save — all rows are empty', 'error');
+            return;
+        }
+
+        saveToLocalStorage();
+
+        saved.forEach(r => r.remove());
+        skipped.forEach(r => r.style.outline = '2px solid #ffa94d');
+        updateRowNumbers();
+
+        const tbody = document.getElementById('spreadsheetBody');
+        if (tbody.children.length === 0) {
+            for (let i = 0; i < 3; i++) addSpreadsheetRow(true);
+        }
+
+        if (skipped.length > 0) {
+            showToast(`Saved ${saved.length} task(s). ${skipped.length} row(s) missing required fields — highlighted.`, 'error');
+        } else {
+            showToast(`Saved ${saved.length} task(s)`, 'success');
+        }
+
+        updateRecentTasks();
+        updateLogKPIs();
+    } finally {
+        setTimeout(() => { _saveInFlight = false; }, 300);
+    }
+}
+
+function clearSpreadsheet() {
+    if (confirm('Clear all rows? (Data will be lost if not saved)')) {
+        document.getElementById('spreadsheetBody').innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            addSpreadsheetRow(true);
+        }
+    }
+}
+
+function updateRecentTasks() {
+    const recent = tasks.slice(-5).reverse();
+    const tbody = document.getElementById('recentTasksBody');
+    tbody.innerHTML = recent.map(task => {
+        const commentText = task.comments ? task.comments.substring(0, 50) + (task.comments.length > 50 ? '...' : '') : '\u2014';
+        return `
+        <tr>
+            <td>${task.person}</td>
+            <td>${task.taskTitle}</td>
+            <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${task.project && projectLogos[task.project] ? `<img class="project-tag-logo" src="${projectLogos[task.project]}" alt="">` : ''}${task.project}</span></td>
+            <td><span class="status-badge status-${task.status.toLowerCase().replace(' ', '')}">${task.status}</span></td>
+            <td style="font-size:12px;">${commentText}</td>
+            <td style="font-size:12px;">${new Date(task.createdAt).toLocaleDateString()}</td>
+        </tr>`;
+    }).join('');
+}
+
+function updateLogKPIs() {
+    const thisWeek = getCurrentWeek();
+    const thisWeekTasks = tasks.filter(t => t.week === thisWeek);
+    document.getElementById('kpi-week-total').textContent = thisWeekTasks.length;
+    document.getElementById('kpi-week-completed').textContent = thisWeekTasks.filter(t => t.status === 'Completed').length;
+}
+
+// --- All Tasks Tab ---
+function updateAllTasksTab() {
+    if (currentUser.role === 'admin') {
+        document.getElementById('bulkCheckHeader').style.display = 'table-cell';
+        document.getElementById('bulkUpdateBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('bulkCheckHeader').style.display = 'none';
+        document.getElementById('bulkUpdateBtn').style.display = 'none';
+    }
+    populateFilterSelects();
+    applyFilters();
+}
+
+function populateFilterSelects() {
+    const people = [...new Set(tasks.map(t => t.person))].sort();
+    const projectsUsed = [...new Set(tasks.map(t => t.project))].sort();
+    const weeksUsed = [...new Set(tasks.map(t => t.week))];
+
+    document.getElementById('filterPerson').innerHTML = '<option value="">All People</option>' + people.map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('filterProject').innerHTML = '<option value="">All Projects</option>' + projectsUsed.map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('filterWeek').innerHTML = '<option value="">All Weeks</option>' + weeksUsed.map(w => `<option value="${w}">${w}</option>`).join('');
+}
+
+function clearAllFilters() {
+    document.getElementById('filterPerson').value = '';
+    document.getElementById('filterProject').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterWeek').value = '';
+    document.getElementById('globalSearch').value = '';
+    applyFilters();
+}
+
+// Debounced version for search input
+const debouncedApplyFilters = debounce(() => applyFilters(), 300);
+
+function applyFilters() {
+    const person = document.getElementById('filterPerson').value;
+    const project = document.getElementById('filterProject').value;
+    const status = document.getElementById('filterStatus').value;
+    const week = document.getElementById('filterWeek').value;
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+
+    let filtered = tasks.filter(t => {
+        if (person && t.person !== person) return false;
+        if (project && t.project !== project) return false;
+        if (status && t.status !== status) return false;
+        if (week && t.week !== week) return false;
+        if (search && !(t.taskTitle||'').toLowerCase().includes(search) && !(t.taskDescription||'').toLowerCase().includes(search) && !(t.comments||'').toLowerCase().includes(search)) return false;
+        return true;
+    });
+
+    filtered.sort((a, b) => {
+        const weekIdxA = weeks.indexOf(a.week);
+        const weekIdxB = weeks.indexOf(b.week);
+        if (weekIdxA !== weekIdxB) return weekIdxB - weekIdxA;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
+    const tbody = document.getElementById('allTasksBody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:#999;">No tasks match your filters</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(task => {
+        try {
+            const isOwner = task.person === currentUser.name;
+            const _canEdit = canEditTask(task);
+            const _canDelete = canDeleteTask(task);
+            const isObserver = currentUser.role === 'observer';
+            const safeId = String(task.id || Date.now()).replace(/'/g, "\\'");
+            const commentCount = (task.observerComments || []).length;
+            const commentPreview = (task.comments || '') ? (task.comments || '').substring(0, 40) + ((task.comments || '').length > 40 ? '...' : '') : '';
+            const priority = task.priority || 'Medium';
+            const status = task.status || 'Not Started';
+
+            return `
+                <tr>
+                    ${currentUser.role === 'admin' ? `<td><input type="checkbox" class="checkbox task-checkbox" data-task-id="${safeId}"></td>` : ''}
+                    <td>${task.person || ''}</td>
+                    <td>${task.taskTitle || ''}</td>
+                    <td style="font-size:12px;color:#6b7b8d;max-width:200px;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${(task.taskDescription||'').replace(/"/g,'&quot;')}">${(task.taskDescription || '').substring(0, 40)}${(task.taskDescription || '').length > 40 ? '...' : ''}</span>
+                            ${task.taskDescription ? `<button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap;" onclick="openDescriptionModal('${safeId}')">View</button>` : ''}
+                        </div>
+                    </td>
+                    <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${task.project && projectLogos[task.project] ? `<img class="project-tag-logo" src="${projectLogos[task.project]}" alt="">` : ''}${task.project || ''}</span></td>
+                    <td>${task.week || ''}</td>
+                    <td><span class="priority-${priority.toLowerCase()}">${priority}</span></td>
+                    <td><span class="status-badge status-${status.toLowerCase().replace(' ', '')}">${status}</span></td>
+                    <td style="font-size:12px;color:#6b7b8d;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(task.comments||'').replace(/"/g,'&quot;')}">${commentPreview}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${_canEdit ? `<button class="btn btn-sm btn-primary" onclick="openEditTaskModal('${safeId}')">Edit</button>` : ''}
+                            ${_canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteTaskById('${safeId}')">Del</button>` : ''}
+                            <button class="btn btn-sm btn-secondary" onclick="openCommentModal('${safeId}')">${commentCount > 0 ? '\ud83d\udcac' + commentCount : '\ud83d\udcac'}</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        } catch (e) {
+            console.error('Error rendering task row:', e, task);
+            return '';
+        }
+    }).join('');
+}
+
+// --- Edit Task Modal ---
+function openEditTaskModal(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+    if (!canEditTask(task)) {
+        showToast('You can only edit your own tasks', 'error');
+        return;
+    }
+    editingTaskId = task.id;
+    document.getElementById('editTaskTitle').value = task.taskTitle;
+    document.getElementById('editTaskDescription').value = task.taskDescription || '';
+    document.getElementById('editTaskPriority').value = task.priority;
+    document.getElementById('editTaskStatus').value = task.status;
+    document.getElementById('editTaskModal').classList.add('active');
+}
+
+function closeEditTaskModal() {
+    document.getElementById('editTaskModal').classList.remove('active');
+    editingTaskId = null;
+}
+
+function saveEditedTask() {
+    const task = tasks.find(t => String(t.id) === String(editingTaskId));
+    if (!task) return;
+    if (!canEditTask(task)) {
+        showToast('You can only edit your own tasks', 'error');
+        return;
+    }
+    task.taskTitle = document.getElementById('editTaskTitle').value;
+    task.taskDescription = document.getElementById('editTaskDescription').value;
+    task.priority = document.getElementById('editTaskPriority').value;
+    task.status = document.getElementById('editTaskStatus').value;
+    task.updatedAt = new Date().toISOString();
+    saveToLocalStorage();
+    showToast('Task updated', 'success');
+    closeEditTaskModal();
+    applyFilters();
+}
+
+// --- Delete Task (with 10-second undo) ---
+function deleteTaskById(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+    if (!canDeleteTask(task)) {
+        showToast('Only admins can delete tasks', 'error');
+        return;
+    }
+
+    // Remove from array immediately for visual feedback
+    const removedTask = { ...task };
+    const removedIndex = tasks.indexOf(task);
+    tasks.splice(removedIndex, 1);
+    _originalSave(); // save locally but DON'T trigger sync yet
+
+    applyFilters();
+    updateLogKPIs();
+
+    // Show undo toast — tombstone is NOT created yet
+    const undoTimer = setTimeout(() => {
+        // Undo window expired → finalize deletion
+        addTombstone(taskId);
+        saveToLocalStorage(); // this triggers sync
+        updateTabBadges();
+    }, 10000);
+
+    showToast(`Deleted "${removedTask.taskTitle}"`, 'success', {
+        label: 'Undo',
+        callback: () => {
+            clearTimeout(undoTimer);
+            // Restore the task
+            tasks.splice(removedIndex, 0, removedTask);
+            _originalSave();
+            applyFilters();
+            updateLogKPIs();
+            showToast('Task restored', 'success');
+        }
+    });
+}
+
+// --- Description Modal ---
+function openDescriptionModal(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+    document.getElementById('descModalPerson').textContent = task.person || '';
+    document.getElementById('descModalTaskTitle').textContent = task.taskTitle || '';
+    document.getElementById('descModalBody').textContent = task.taskDescription || '(No description)';
+    document.getElementById('descriptionModal').classList.add('active');
+}
+
+function closeDescriptionModal() {
+    document.getElementById('descriptionModal').classList.remove('active');
+}
+
+// --- Bulk Operations ---
+function getFilteredTasks() {
+    const person = document.getElementById('filterPerson').value;
+    const project = document.getElementById('filterProject').value;
+    const status = document.getElementById('filterStatus').value;
+    const week = document.getElementById('filterWeek').value;
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+
+    return tasks.filter(t => {
+        if (person && t.person !== person) return false;
+        if (project && t.project !== project) return false;
+        if (status && t.status !== status) return false;
+        if (week && t.week !== week) return false;
+        if (search && !(t.taskTitle||'').toLowerCase().includes(search) && !(t.taskDescription||'').toLowerCase().includes(search) && !(t.comments||'').toLowerCase().includes(search)) return false;
+        return true;
+    });
+}
+
+function showBulkUpdate() {
+    const checked = document.querySelectorAll('.task-checkbox:checked');
+    const taskIds = Array.from(checked).map(c => c.dataset.taskId);
+
+    if (taskIds.length === 0) {
+        showToast('Select at least one task', 'error');
+        return;
+    }
+
+    if (confirm(`Mark ${taskIds.length} task(s) as Completed?`)) {
+        taskIds.forEach(id => {
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (task) {
+                task.status = 'Completed';
+                task.updatedAt = new Date().toISOString();
+            }
+        });
+        saveToLocalStorage();
+        showToast(`${taskIds.length} task(s) completed`, 'success');
+        applyFilters();
+        updateOverview();
+        updateTabBadges();
+    }
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAllCheckbox').checked;
+    document.querySelectorAll('.task-checkbox').forEach(cb => cb.checked = checked);
+}
+
+function exportFilteredTasks() {
+    const filtered = getFilteredTasks();
+    let csv = 'Person,Task Title,Project,Week,Priority,Status,Description,Comments\n';
+    filtered.forEach(t => {
+        csv += `"${t.person}","${t.taskTitle}","${t.project}","${t.week}","${t.priority}","${t.status}","${t.taskDescription}","${t.comments}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+}
+
+// --- Comments ---
+function openCommentModal(taskId) {
+    commentingTaskId = taskId;
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    const list = document.getElementById('commentList');
+    list.innerHTML = (task.observerComments || []).map(c => `
+        <div class="comment-item">
+            <div class="comment-author">${c.author} <span class="comment-time">${new Date(c.timestamp).toLocaleString()}</span></div>
+            <div class="comment-text">${c.text}</div>
+        </div>
+    `).join('') || '<p style="color:#999; text-align:center;">No comments yet</p>';
+    document.getElementById('commentModal').classList.add('active');
+}
+
+function closeCommentModal() {
+    document.getElementById('commentModal').classList.remove('active');
+    commentingTaskId = null;
+    document.getElementById('commentInput').value = '';
+}
+
+function addComment() {
+    const text = document.getElementById('commentInput').value.trim();
+    if (!text) return;
+    const task = tasks.find(t => String(t.id) === String(commentingTaskId));
+    if (!task) return;
+    if (!task.observerComments) task.observerComments = [];
+    task.observerComments.push({
+        author: currentUser.name,
+        text,
+        timestamp: new Date().toISOString()
+    });
+    saveToLocalStorage();
+    showToast('Comment added', 'success');
+    document.getElementById('commentInput').value = '';
+    openCommentModal(commentingTaskId);
+}
