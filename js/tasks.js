@@ -844,9 +844,14 @@ function parseQuickEntry() {
 
     _qeParsedTasks = lines.map(line => {
         const detected = _detectFromText(line);
+        // Clean description: strip trailing status/priority tags but keep project names
+        var desc = line;
+        desc = desc.replace(/\s*[-–—]\s*(done|finished|completed|complete|submitted|sent|delivered|resolved|closed|in progress|working on|started|ongoing|wip|doing|active|not started|todo|to do|pending|waiting|blocked|on hold|later|urgent|asap|critical|high priority|important|top priority|low priority|not urgent|high|medium|low)\s*$/i, '');
+        desc = desc.replace(/\(\s*(done|completed|in progress|urgent|high priority|low priority|not started|pending|finished|important)\s*\)/gi, '');
+        desc = desc.replace(/\s+/g, ' ').replace(/^[\s,\-–—:]+|[\s,\-–—:]+$/g, '').trim();
         return {
             title: detected.category || '',
-            description: line,
+            description: desc || line,
             project: detected.project,
             category: detected.category,
             priority: detected.priority || defaultPriority,
