@@ -850,7 +850,7 @@ function parseQuickEntry() {
             project: detected.project,
             category: detected.category,
             priority: detected.priority || defaultPriority,
-            status: defaultStatus,
+            status: detected.status || defaultStatus,
             person: currentUser.name
         };
     });
@@ -861,8 +861,39 @@ function parseQuickEntry() {
 }
 
 function _detectFromText(text) {
-    const result = { title: '', project: '', category: '', priority: '' };
+    const result = { title: '', project: '', category: '', priority: 'Medium', status: 'Not Started' };
     const lower = text.toLowerCase();
+
+    // --- Detect status (before title cleanup) ---
+    const statusPatterns = [
+        { patterns: ['done', 'finished', 'completed', 'complete', 'submitted', 'sent', 'delivered', 'resolved', 'closed'], status: 'Completed' },
+        { patterns: ['in progress', 'working on', 'started', 'ongoing', 'wip', 'doing', 'active', 'drafting', 'preparing'], status: 'In Progress' },
+        { patterns: ['not started', 'todo', 'to do', 'to-do', 'pending', 'waiting', 'blocked', 'on hold', 'later', 'backlog'], status: 'Not Started' }
+    ];
+    for (const group of statusPatterns) {
+        for (const pat of group.patterns) {
+            if (lower.includes(pat)) {
+                result.status = group.status;
+                break;
+            }
+        }
+        if (result.status !== 'Not Started' || lower.includes('not started') || lower.includes('todo') || lower.includes('to do') || lower.includes('to-do') || lower.includes('pending')) break;
+    }
+
+    // --- Detect priority ---
+    const priorityPatterns = [
+        { patterns: ['urgent', 'asap', 'critical', 'immediately', 'high priority', 'important', '!!!', 'top priority', 'deadline'], priority: 'High' },
+        { patterns: ['low priority', 'when possible', 'nice to have', 'eventually', 'if time', 'not urgent', 'whenever'], priority: 'Low' }
+    ];
+    for (const group of priorityPatterns) {
+        for (const pat of group.patterns) {
+            if (lower.includes(pat)) {
+                result.priority = group.priority;
+                break;
+            }
+        }
+        if (result.priority !== 'Medium') break;
+    }
 
     // --- Detect project ---
     // Build aliases: map lowercase variations → actual project name
@@ -872,6 +903,9 @@ function _detectFromText(text) {
         // Common variations
         const noSpace = p.replace(/\s+/g, '').toLowerCase();
         projectAliases[noSpace] = p;
+        // Also match without parenthetical suffixes: "CPP4ALL (COST)" → "cpp4all"
+        const noParen = p.replace(/\s*\(.*\)/, '').toLowerCase();
+        if (noParen !== p.toLowerCase()) projectAliases[noParen] = p;
     });
     // Add manual aliases for common shorthand
     projectAliases['spacebic'] = projects.find(p => p.toLowerCase().includes('space')) || '';
@@ -881,13 +915,28 @@ function _detectFromText(text) {
     projectAliases['cpp4all'] = projects.find(p => p.toLowerCase().includes('cpp')) || '';
     projectAliases['cost'] = projects.find(p => p.toLowerCase().includes('cost')) || '';
 
-    // Check longest match first
+    // Check longest match first (use word boundary matching for short names)
     const sortedAliases = Object.keys(projectAliases).sort((a, b) => b.length - a.length);
     for (const alias of sortedAliases) {
-        if (alias && lower.includes(alias)) {
-            result.project = projectAliases[alias];
-            break;
+        if (!alias) continue;
+        // For short aliases (<=4 chars), require word boundary to avoid false positives
+        if (alias.length <= 4) {
+            const wordBound = new RegExp('\\b' + alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+            if (wordBound.test(text)) {
+                result.project = projectAliases[alias];
+                break;
+            }
+        } else {
+            if (lower.includes(alias)) {
+                result.project = projectAliases[alias];
+                break;
+            }
         }
+    }
+
+    // Default to "Other Tasks" if no project was detected
+    if (!result.project) {
+        result.project = 'Other Tasks';
     }
 
     // --- Detect category from taskCategories ---
@@ -897,6 +946,9 @@ function _detectFromText(text) {
         'stakeholder': 'Stakeholder Meeting',
         'email': 'Administrative Follow-up',
         'send email': 'Administrative Follow-up',
+        'follow up': 'Administrative Follow-up',
+        'follow-up': 'Administrative Follow-up',
+        'admin': 'Administrative Follow-up',
         'send invitation': 'Event Planning & Logistics',
         'invitation': 'Event Planning & Logistics',
         'badge': 'Event Planning & Logistics',
@@ -920,8 +972,14 @@ function _detectFromText(text) {
         'deliverable': 'Reports (internal, external, events, etc.)',
         'paper': 'Manuscript Writing/Review/Proofreading',
         'manuscript': 'Manuscript Writing/Review/Proofreading',
+        'review': 'Manuscript Writing/Review/Proofreading',
+        'proofread': 'Manuscript Writing/Review/Proofreading',
         'abstract': 'Abstract / Proposal Submission',
         'proposal': 'Proposal Writing / Preparation',
+        'budget': 'Financial Management & Reporting',
+        'financial': 'Financial Management & Reporting',
+        'finance': 'Financial Management & Reporting',
+        'timesheet': 'Financial Management & Reporting',
         'social media': 'Social Media Content Preparation',
         'twitter': 'Social Media Content Preparation',
         'linkedin': 'Social Media Content Preparation',
@@ -937,6 +995,7 @@ function _detectFromText(text) {
         'data': 'Data Research & Analysis',
         'mou': 'MoU / Agreement Preparation',
         'agreement': 'MoU / Agreement Preparation',
+        'ethics': 'Administrative Follow-up',
         'dissemination': 'Dissemination & Outreach',
         'outreach': 'Dissemination & Outreach',
         'pilot': 'Pilot Projects',
@@ -962,30 +1021,38 @@ function _detectFromText(text) {
     }
 
     // --- Generate title ---
-    // Take the first ~70 chars, clean up
     let title = text;
+
+    // Strip status/priority signal words from the title so it reads cleanly
+    const stripPatterns = [
+        /\s*[-–—]\s*(done|finished|completed|complete|submitted|sent|delivered|resolved|closed)\s*$/i,
+        /\s*[-–—]\s*(in progress|working on|started|ongoing|wip|doing|active)\s*$/i,
+        /\s*[-–—]\s*(not started|todo|to do|pending|waiting|blocked|on hold|later)\s*$/i,
+        /\s*[-–—]\s*(urgent|asap|critical|high priority|important|top priority|low priority|not urgent)\s*$/i,
+        /\s*[-–—]\s*(high|medium|low)\s+(priority)\s*$/i,
+        /\(\s*(done|completed|in progress|urgent|high priority|low priority|not started|pending)\s*\)/gi,
+    ];
+    for (const pat of stripPatterns) {
+        title = title.replace(pat, '');
+    }
+
     // Remove project name from title if present (it's redundant)
     if (result.project) {
-        const projRegex = new RegExp(result.project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        const projRegex = new RegExp('\\b' + result.project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
         title = title.replace(projRegex, '').trim();
+        // Also remove "for <project>" pattern
+        title = title.replace(/\s+for\s*$/i, '').trim();
     }
-    // Remove trailing "for ... event" if too long
+    // Truncate if too long
     if (title.length > 70) {
         title = title.substring(0, 70).replace(/\s\S*$/, '') + '...';
     }
     // Clean up double spaces, leading/trailing punctuation
-    title = title.replace(/\s+/g, ' ').replace(/^[\s,\-–]+|[\s,\-–]+$/g, '').trim();
+    title = title.replace(/\s+/g, ' ').replace(/^[\s,\-–—]+|[\s,\-–—]+$/g, '').trim();
     // Use category as title if we detected one and the line was very short
     if (result.category && !title) title = result.category;
 
     result.title = title || text.substring(0, 60);
-
-    // --- Detect priority ---
-    if (lower.includes('urgent') || lower.includes('asap') || lower.includes('critical') || lower.includes('immediately')) {
-        result.priority = 'High';
-    } else if (lower.includes('when possible') || lower.includes('low priority') || lower.includes('nice to have')) {
-        result.priority = 'Low';
-    }
 
     return result;
 }
@@ -995,7 +1062,9 @@ function _renderQeParsed() {
     document.getElementById('qeCount').textContent = _qeParsedTasks.length;
 
     container.innerHTML = _qeParsedTasks.map((t, i) => {
-        const projOptions = '<option value="">— None —</option>' + projects.map(p =>
+        // Build project options, include "Other Tasks" if not already in the list
+        const projList = projects.includes('Other Tasks') ? projects : [...projects, 'Other Tasks'];
+        const projOptions = '<option value="">— None —</option>' + projList.map(p =>
             `<option value="${p}" ${p === t.project ? 'selected' : ''}>${p}</option>`
         ).join('');
 
@@ -1003,7 +1072,7 @@ function _renderQeParsed() {
             `<option value="${c}" ${c === t.category ? 'selected' : ''}>${c}</option>`
         ).join('');
 
-        const projDetected = t.project ? `style="background:rgba(0,174,239,0.08);border:1px solid rgba(0,174,239,0.3);"` : '';
+        const projDetected = (t.project && t.project !== 'Other Tasks') ? `style="background:rgba(0,174,239,0.08);border:1px solid rgba(0,174,239,0.3);"` : '';
 
         return `<div class="qe-card" ${projDetected} data-idx="${i}" style="padding:12px;border-radius:8px;border:1px solid #e0e7f1;margin-bottom:8px;background:var(--surface-white);">
             <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
