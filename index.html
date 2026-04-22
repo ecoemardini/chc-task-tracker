@@ -1246,6 +1246,7 @@
                 <button class="btn btn-primary" onclick="addSpreadsheetRow()">+ Add Row</button>
                 <button class="btn btn-success" onclick="saveAllTasks()">Save All Tasks</button>
                 <button class="btn btn-secondary" onclick="clearSpreadsheet()">Clear</button>
+                <button class="btn btn-secondary" onclick="openQuickEntry()" style="background:var(--dark-navy);color:white;">&#x26A1; Quick Entry</button>
             </div>
             <table class="spreadsheet-table" id="spreadsheetTable">
                 <thead>
@@ -1612,6 +1613,58 @@
             <p id="descModalPerson" style="font-size: 12px; color: #6b7b8d; margin-bottom: 4px;"></p>
             <h3 id="descModalTaskTitle" style="margin-bottom: 12px; color: var(--dark-navy);"></h3>
             <div id="descModalBody" style="white-space: pre-wrap; line-height: 1.7; font-size: 14px; color: var(--text-dark); background: var(--light-bg); padding: 16px; border-radius: 8px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Entry Modal -->
+<div id="quickEntryModal" class="modal">
+    <div class="modal-content" style="max-width:820px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header">
+            <span>Quick Entry — Paste Your Tasks</span>
+            <button class="modal-close" onclick="closeQuickEntry()">×</button>
+        </div>
+        <div style="padding:20px;">
+            <!-- Step 1: Paste -->
+            <div id="qeStep1">
+                <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Paste your task list below — one per line, numbered or not. The app will auto-detect projects, titles, and categories.</p>
+                <textarea id="qeRawInput" style="width:100%;height:180px;padding:12px;border:1px solid #e0e7f1;border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;resize:vertical;" placeholder="1. Attend SPACEBIC Bootcamp between 7-8 April
+2. Send invitations for EU Presidency event
+3. Create badges for EU Presidency
+..."></textarea>
+                <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+                    <div class="form-field" style="margin:0;">
+                        <label style="font-size:11px;">Default Status</label>
+                        <select id="qeDefaultStatus" style="padding:6px 10px;font-size:12px;">
+                            <option value="Not Started">Not Started</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-field" style="margin:0;">
+                        <label style="font-size:11px;">Default Priority</label>
+                        <select id="qeDefaultPriority" style="padding:6px 10px;font-size:12px;">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="parseQuickEntry()" style="margin-left:auto;">Parse Tasks &#x2192;</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Review -->
+            <div id="qeStep2" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <p style="font-size:13px;color:var(--text-dim);margin:0;">Review and adjust. Auto-detected projects are highlighted.</p>
+                    <button class="btn btn-secondary btn-sm" onclick="backToQeStep1()">&#x2190; Back</button>
+                </div>
+                <div id="qeParsedList" style="max-height:50vh;overflow-y:auto;"></div>
+                <div style="display:flex;gap:10px;margin-top:14px;">
+                    <button class="btn btn-success" onclick="saveQuickEntryTasks()">Save All (<span id="qeCount">0</span> tasks)</button>
+                    <button class="btn btn-secondary" onclick="closeQuickEntry()">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>

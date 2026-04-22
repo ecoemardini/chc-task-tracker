@@ -800,3 +800,291 @@ function findWeekLabel(date) {
     }
     return null;
 }
+
+// ============ QUICK ENTRY ============
+// Paste a freeform task list → auto-parse into structured tasks.
+
+let _qeParsedTasks = [];
+
+function openQuickEntry() {
+    document.getElementById('qeRawInput').value = '';
+    document.getElementById('qeStep1').style.display = '';
+    document.getElementById('qeStep2').style.display = 'none';
+    document.getElementById('qeDefaultStatus').value = 'In Progress';
+    document.getElementById('qeDefaultPriority').value = 'Medium';
+    _qeParsedTasks = [];
+    document.getElementById('quickEntryModal').classList.add('active');
+}
+
+function closeQuickEntry() {
+    document.getElementById('quickEntryModal').classList.remove('active');
+    _qeParsedTasks = [];
+}
+
+function backToQeStep1() {
+    document.getElementById('qeStep1').style.display = '';
+    document.getElementById('qeStep2').style.display = 'none';
+}
+
+function parseQuickEntry() {
+    const raw = document.getElementById('qeRawInput').value.trim();
+    if (!raw) { showToast('Please paste your task list first', 'error'); return; }
+
+    const defaultStatus = document.getElementById('qeDefaultStatus').value;
+    const defaultPriority = document.getElementById('qeDefaultPriority').value;
+
+    // Split into lines, strip numbering and bullets
+    const lines = raw.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .map(l => l.replace(/^\d+[\.\)\-\:]\s*/, '').replace(/^[\-\•\*\>]\s*/, '').trim())
+        .filter(l => l.length > 2);
+
+    if (lines.length === 0) { showToast('No tasks found in the text', 'error'); return; }
+
+    _qeParsedTasks = lines.map(line => {
+        const detected = _detectFromText(line);
+        return {
+            title: detected.title,
+            description: line,
+            project: detected.project,
+            category: detected.category,
+            priority: detected.priority || defaultPriority,
+            status: defaultStatus,
+            person: currentUser.name
+        };
+    });
+
+    _renderQeParsed();
+    document.getElementById('qeStep1').style.display = 'none';
+    document.getElementById('qeStep2').style.display = '';
+}
+
+function _detectFromText(text) {
+    const result = { title: '', project: '', category: '', priority: '' };
+    const lower = text.toLowerCase();
+
+    // --- Detect project ---
+    // Build aliases: map lowercase variations → actual project name
+    const projectAliases = {};
+    projects.forEach(p => {
+        projectAliases[p.toLowerCase()] = p;
+        // Common variations
+        const noSpace = p.replace(/\s+/g, '').toLowerCase();
+        projectAliases[noSpace] = p;
+    });
+    // Add manual aliases for common shorthand
+    projectAliases['spacebic'] = projects.find(p => p.toLowerCase().includes('space')) || '';
+    projectAliases['space bic'] = projects.find(p => p.toLowerCase().includes('space')) || '';
+    projectAliases['eu presidency'] = projects.find(p => p.toLowerCase().includes('presid')) || '';
+    projectAliases['presidency'] = projects.find(p => p.toLowerCase().includes('presid')) || '';
+    projectAliases['cpp4all'] = projects.find(p => p.toLowerCase().includes('cpp')) || '';
+    projectAliases['cost'] = projects.find(p => p.toLowerCase().includes('cost')) || '';
+
+    // Check longest match first
+    const sortedAliases = Object.keys(projectAliases).sort((a, b) => b.length - a.length);
+    for (const alias of sortedAliases) {
+        if (alias && lower.includes(alias)) {
+            result.project = projectAliases[alias];
+            break;
+        }
+    }
+
+    // --- Detect category from taskCategories ---
+    const categoryKeywords = {
+        'meeting': 'Internal Meeting',
+        'consortium': 'Consortium Meeting',
+        'stakeholder': 'Stakeholder Meeting',
+        'email': 'Administrative Follow-up',
+        'send email': 'Administrative Follow-up',
+        'send invitation': 'Event Planning & Logistics',
+        'invitation': 'Event Planning & Logistics',
+        'badge': 'Event Planning & Logistics',
+        'catering': 'Event Planning & Logistics',
+        'book taxi': 'Travel Coordination',
+        'taxi': 'Travel Coordination',
+        'travel': 'Travel Coordination',
+        'flight': 'Travel Coordination',
+        'hotel': 'Travel Coordination',
+        'booking': 'Travel Coordination',
+        'purchase request': 'Administrative Follow-up',
+        'purchase': 'Administrative Follow-up',
+        'invoice': 'Administrative Follow-up',
+        'presentation': 'Preparation of Presentations',
+        'slides': 'Preparation of Presentations',
+        'html': 'Digital Tool / Platform Development',
+        'app': 'Digital Tool / Platform Development',
+        'website': 'Database / Website Development',
+        'database': 'Database / Website Development',
+        'report': 'Reports (internal, external, events, etc.)',
+        'deliverable': 'Reports (internal, external, events, etc.)',
+        'paper': 'Manuscript Writing/Review/Proofreading',
+        'manuscript': 'Manuscript Writing/Review/Proofreading',
+        'abstract': 'Abstract / Proposal Submission',
+        'proposal': 'Proposal Writing / Preparation',
+        'social media': 'Social Media Content Preparation',
+        'twitter': 'Social Media Content Preparation',
+        'linkedin': 'Social Media Content Preparation',
+        'post': 'Social Media Content Preparation',
+        'press release': 'Press Release / Public Communication',
+        'training': 'Training & Courses',
+        'course': 'Training & Courses',
+        'bootcamp': 'Training & Courses',
+        'workshop': 'Training & Courses',
+        'fieldwork': 'Research Development',
+        'survey': 'Research Development',
+        'analysis': 'Data Research & Analysis',
+        'data': 'Data Research & Analysis',
+        'mou': 'MoU / Agreement Preparation',
+        'agreement': 'MoU / Agreement Preparation',
+        'dissemination': 'Dissemination & Outreach',
+        'outreach': 'Dissemination & Outreach',
+        'pilot': 'Pilot Projects',
+        'event': 'Event Planning & Logistics',
+        'attend': 'Event Participation',
+        'participate': 'Event Participation',
+        'conference': 'Event Participation',
+        'roll-up': 'Event Planning & Logistics',
+        'banner': 'Event Planning & Logistics',
+        'print': 'Event Planning & Logistics',
+        'coordinate': 'Project Coordination',
+        'schedule': 'Project Planning & Scheduling',
+        'plan': 'Project Planning & Scheduling'
+    };
+
+    // Check longest keyword match first
+    const sortedKeywords = Object.keys(categoryKeywords).sort((a, b) => b.length - a.length);
+    for (const kw of sortedKeywords) {
+        if (lower.includes(kw)) {
+            result.category = categoryKeywords[kw];
+            break;
+        }
+    }
+
+    // --- Generate title ---
+    // Take the first ~70 chars, clean up
+    let title = text;
+    // Remove project name from title if present (it's redundant)
+    if (result.project) {
+        const projRegex = new RegExp(result.project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        title = title.replace(projRegex, '').trim();
+    }
+    // Remove trailing "for ... event" if too long
+    if (title.length > 70) {
+        title = title.substring(0, 70).replace(/\s\S*$/, '') + '...';
+    }
+    // Clean up double spaces, leading/trailing punctuation
+    title = title.replace(/\s+/g, ' ').replace(/^[\s,\-–]+|[\s,\-–]+$/g, '').trim();
+    // Use category as title if we detected one and the line was very short
+    if (result.category && !title) title = result.category;
+
+    result.title = title || text.substring(0, 60);
+
+    // --- Detect priority ---
+    if (lower.includes('urgent') || lower.includes('asap') || lower.includes('critical') || lower.includes('immediately')) {
+        result.priority = 'High';
+    } else if (lower.includes('when possible') || lower.includes('low priority') || lower.includes('nice to have')) {
+        result.priority = 'Low';
+    }
+
+    return result;
+}
+
+function _renderQeParsed() {
+    const container = document.getElementById('qeParsedList');
+    document.getElementById('qeCount').textContent = _qeParsedTasks.length;
+
+    container.innerHTML = _qeParsedTasks.map((t, i) => {
+        const projOptions = '<option value="">— None —</option>' + projects.map(p =>
+            `<option value="${p}" ${p === t.project ? 'selected' : ''}>${p}</option>`
+        ).join('');
+
+        const catOptions = '<option value="">— Auto —</option>' + taskCategories.map(c =>
+            `<option value="${c}" ${c === t.category ? 'selected' : ''}>${c}</option>`
+        ).join('');
+
+        const projDetected = t.project ? `style="background:rgba(0,174,239,0.08);border:1px solid rgba(0,174,239,0.3);"` : '';
+
+        return `<div class="qe-card" ${projDetected} data-idx="${i}" style="padding:12px;border-radius:8px;border:1px solid #e0e7f1;margin-bottom:8px;background:var(--surface-white);">
+            <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+                <span style="color:var(--text-dim);font-weight:700;font-size:12px;min-width:20px;">${i + 1}</span>
+                <div style="flex:1;">
+                    <input type="text" class="qe-title" value="${t.title.replace(/"/g, '&quot;')}" style="width:100%;font-weight:600;font-size:13px;border:1px solid #e0e7f1;border-radius:6px;padding:6px 8px;margin-bottom:4px;">
+                    <div style="font-size:11px;color:var(--text-dim);line-height:1.4;max-height:36px;overflow:hidden;">${t.description}</div>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="removeQeTask(${i})" style="padding:2px 8px;font-size:11px;">×</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <select class="qe-project" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #e0e7f1;">${projOptions}</select>
+                <select class="qe-category" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #e0e7f1;max-width:200px;">${catOptions}</select>
+                <select class="qe-priority" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #e0e7f1;">
+                    <option value="Low" ${t.priority === 'Low' ? 'selected' : ''}>Low</option>
+                    <option value="Medium" ${t.priority === 'Medium' ? 'selected' : ''}>Medium</option>
+                    <option value="High" ${t.priority === 'High' ? 'selected' : ''}>High</option>
+                </select>
+                <select class="qe-status" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #e0e7f1;">
+                    <option value="Not Started" ${t.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                    <option value="In Progress" ${t.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                    <option value="Completed" ${t.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                </select>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function removeQeTask(index) {
+    _qeParsedTasks.splice(index, 1);
+    _renderQeParsed();
+}
+
+function saveQuickEntryTasks() {
+    // Read values from DOM (user may have edited them)
+    const cards = document.querySelectorAll('#qeParsedList .qe-card');
+    const curWeek = getCurrentWeek();
+    let saved = 0;
+
+    cards.forEach((card, i) => {
+        const title = card.querySelector('.qe-title').value.trim();
+        const project = card.querySelector('.qe-project').value;
+        const category = card.querySelector('.qe-category').value;
+        const priority = card.querySelector('.qe-priority').value;
+        const status = card.querySelector('.qe-status').value;
+        const description = _qeParsedTasks[i] ? _qeParsedTasks[i].description : '';
+
+        if (!title) return;
+
+        // Use category as title if user selected one and title matches original
+        const finalTitle = category || title;
+
+        const now = new Date().toISOString();
+        const taskId = newTaskId();
+        tasks.push({
+            id: taskId,
+            person: currentUser.name,
+            week: curWeek,
+            project: project,
+            taskTitle: finalTitle,
+            taskDescription: description,
+            priority: priority,
+            status: status,
+            comments: '',
+            observerComments: [],
+            links: [],
+            createdAt: now,
+            updatedAt: now
+        });
+        markTaskDirty(taskId);
+        saved++;
+    });
+
+    if (saved > 0) {
+        logActivity('create', `Quick Entry: ${saved} task(s) added`);
+        saveToLocalStorage();
+        showToast(`Created ${saved} task(s) via Quick Entry`, 'success');
+        updateRecentTasks();
+        updateLogKPIs();
+        updateTabBadges();
+    }
+
+    closeQuickEntry();
+}
