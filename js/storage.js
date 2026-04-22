@@ -28,7 +28,7 @@ function loadFromLocalStorage() {
 }
 
 // --- Sync Configuration ---
-const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxFzITJfQN0cF4kan8GSeVDQJLqvPdDrczzZlNjRcwUs-d8ql381jos4fM5KzLXd3k/exec';
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbyAqa6wMfMn-_K96P9EZbC9hzGfDWu8akylwuor_NwReCeBdsKfoeKLGGt9Ps4C1PJ5/exec';
 
 let isOnline = navigator.onLine;
 let isSyncing = false;
