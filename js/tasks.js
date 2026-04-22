@@ -290,10 +290,15 @@ function updateRecentTasks() {
 }
 
 function updateLogKPIs() {
-    const thisWeek = getCurrentWeek();
-    const thisWeekTasks = tasks.filter(t => t.week === thisWeek);
-    document.getElementById('kpi-week-total').textContent = thisWeekTasks.length;
-    document.getElementById('kpi-week-completed').textContent = thisWeekTasks.filter(t => t.status === 'Completed').length;
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === 'Completed').length;
+    const inProgress = tasks.filter(t => t.status === 'In Progress').length;
+    const highPriority = tasks.filter(t => t.priority === 'High').length;
+
+    document.getElementById('kpi-total-log').textContent = total;
+    document.getElementById('kpi-completed-log').textContent = completed;
+    document.getElementById('kpi-inprogress-log').textContent = inProgress;
+    document.getElementById('kpi-high-log').textContent = highPriority;
 }
 
 // --- All Tasks Tab ---
