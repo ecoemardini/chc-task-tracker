@@ -117,6 +117,7 @@ function updateSettingsTab() {
     updateProjectsSettings();
     updateCategoriesSettings();
     updatePinSettings();
+    renderActivityLog();
 }
 
 function updateTeamMembersSettings() {
@@ -402,6 +403,8 @@ if ('serviceWorker' in navigator) {
 // Load sync state and initialize
 loadPendingChanges();
 loadTombstones();
+loadDirtyIds();
+loadActivityLog();
 try {
     const ls = localStorage.getItem('chc_last_sync');
     if (ls) lastSyncTime = new Date(ls);

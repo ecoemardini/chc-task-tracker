@@ -895,6 +895,14 @@
         .cal-evt:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
         .cal-evt-txt { overflow: hidden; text-overflow: ellipsis; }
 
+        .cal-drop-highlight {
+            background: rgba(0, 174, 239, 0.18) !important;
+            outline: 2px dashed var(--primary-blue);
+            outline-offset: -2px;
+        }
+        .cal-evt[draggable] { cursor: grab; }
+        .cal-evt[draggable]:active { cursor: grabbing; }
+
         .cal-today-line {
             position: absolute; top: 0; bottom: 0; width: 2px;
             background: var(--danger); z-index: 3; pointer-events: none;
@@ -1517,6 +1525,13 @@
                     <h3>User PIN Management</h3>
                     <div id="pinSettings"></div>
                 </div>
+
+                <!-- Activity Log (admin only) -->
+                <div class="form-section">
+                    <h3>Activity Log</h3>
+                    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Recent actions across the team (last 50 entries)</p>
+                    <div id="activityLogContainer" style="max-height:400px;overflow-y:auto;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1568,6 +1583,15 @@
                     <option value="In Progress">In Progress</option>
                     <option value="Completed">Completed</option>
                 </select>
+            </div>
+            <div class="form-field" style="margin-bottom: 15px;">
+                <label>Links / Attachments</label>
+                <div id="editTaskLinksContainer" style="margin-bottom:8px;"></div>
+                <div style="display:flex;gap:6px;">
+                    <input type="text" id="editTaskNewLinkUrl" placeholder="Paste URL (Google Drive, etc.)" style="flex:2;">
+                    <input type="text" id="editTaskNewLinkLabel" placeholder="Label (optional)" style="flex:1;">
+                    <button class="btn btn-sm btn-secondary" onclick="addLinkToEditTask()" style="white-space:nowrap;">+ Add</button>
+                </div>
             </div>
             <div style="display: flex; gap: 10px;">
                 <button class="btn btn-success" onclick="saveEditedTask()">Save</button>

@@ -217,8 +217,9 @@ function saveAllTasks() {
             }
 
             const now = new Date().toISOString();
+            const taskId = newTaskId();
             tasks.push({
-                id: newTaskId(),
+                id: taskId,
                 person,
                 week,
                 project,
@@ -228,9 +229,12 @@ function saveAllTasks() {
                 status,
                 comments,
                 observerComments: [],
+                links: [],
                 createdAt: now,
                 updatedAt: now
             });
+            markTaskDirty(taskId);
+            logActivity('create', `"${title}" for ${person.split(' ')[0]} (${project})`);
             saved.push(row);
         });
 
@@ -373,6 +377,7 @@ function applyFilters() {
             const isObserver = currentUser.role === 'observer';
             const safeId = String(task.id || Date.now()).replace(/'/g, "\\'");
             const commentCount = (task.observerComments || []).length;
+            const linkCount = (task.links || []).length;
             const commentPreview = (task.comments || '') ? (task.comments || '').substring(0, 40) + ((task.comments || '').length > 40 ? '...' : '') : '';
             const priority = task.priority || 'Medium';
             const status = task.status || 'Not Started';
@@ -398,6 +403,7 @@ function applyFilters() {
                             ${_canEdit ? `<button class="btn btn-sm btn-primary" onclick="openEditTaskModal('${safeId}')">Edit</button>` : ''}
                             ${_canEdit ? `<button class="btn btn-sm btn-secondary" onclick="openRepeatModal('${safeId}')" title="Repeat">&#x21bb;</button>` : ''}
                             ${_canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteTaskById('${safeId}')">Del</button>` : ''}
+                            ${linkCount > 0 ? `<span style="font-size:12px;color:var(--primary-blue);cursor:pointer;" onclick="openEditTaskModal('${safeId}')" title="${linkCount} link(s)">&#x1F517;${linkCount}</span>` : ''}
                             <button class="btn btn-sm btn-secondary" onclick="openCommentModal('${safeId}')">${commentCount > 0 ? '\ud83d\udcac' + commentCount : '\ud83d\udcac'}</button>
                         </div>
                     </td>
@@ -423,12 +429,65 @@ function openEditTaskModal(taskId) {
     document.getElementById('editTaskDescription').value = task.taskDescription || '';
     document.getElementById('editTaskPriority').value = task.priority;
     document.getElementById('editTaskStatus').value = task.status;
+    // Render existing links
+    _editTaskLinks = (task.links || []).slice();
+    renderEditTaskLinks();
+    document.getElementById('editTaskNewLinkUrl').value = '';
+    document.getElementById('editTaskNewLinkLabel').value = '';
     document.getElementById('editTaskModal').classList.add('active');
 }
 
 function closeEditTaskModal() {
     document.getElementById('editTaskModal').classList.remove('active');
     editingTaskId = null;
+    _editTaskLinks = [];
+}
+
+// --- Link Management in Edit Modal ---
+let _editTaskLinks = [];
+
+function renderEditTaskLinks() {
+    const container = document.getElementById('editTaskLinksContainer');
+    if (!container) return;
+    if (_editTaskLinks.length === 0) {
+        container.innerHTML = '<p style="font-size:12px;color:var(--text-dim);">No links yet</p>';
+        return;
+    }
+    container.innerHTML = _editTaskLinks.map((link, i) => {
+        const label = link.label || _shortenUrl(link.url);
+        return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f0f4f8;">
+            <span style="font-size:16px;">&#x1F517;</span>
+            <a href="${link.url}" target="_blank" rel="noopener" style="flex:1;font-size:12px;color:var(--primary-blue);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</a>
+            <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" onclick="removeLinkFromEditTask(${i})">×</button>
+        </div>`;
+    }).join('');
+}
+
+function addLinkToEditTask() {
+    const url = document.getElementById('editTaskNewLinkUrl').value.trim();
+    const label = document.getElementById('editTaskNewLinkLabel').value.trim();
+    if (!url) { showToast('Please enter a URL', 'error'); return; }
+    // Basic URL validation
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        showToast('URL should start with http:// or https://', 'error');
+        return;
+    }
+    _editTaskLinks.push({ url, label: label || '' });
+    renderEditTaskLinks();
+    document.getElementById('editTaskNewLinkUrl').value = '';
+    document.getElementById('editTaskNewLinkLabel').value = '';
+}
+
+function removeLinkFromEditTask(index) {
+    _editTaskLinks.splice(index, 1);
+    renderEditTaskLinks();
+}
+
+function _shortenUrl(url) {
+    try {
+        const u = new URL(url);
+        return u.hostname + (u.pathname.length > 20 ? u.pathname.substring(0, 20) + '...' : u.pathname);
+    } catch { return url.substring(0, 40); }
 }
 
 function saveEditedTask() {
@@ -438,11 +497,19 @@ function saveEditedTask() {
         showToast('You can only edit your own tasks', 'error');
         return;
     }
+    const oldStatus = task.status;
     task.taskTitle = document.getElementById('editTaskTitle').value;
     task.taskDescription = document.getElementById('editTaskDescription').value;
     task.priority = document.getElementById('editTaskPriority').value;
     task.status = document.getElementById('editTaskStatus').value;
+    task.links = _editTaskLinks.slice();
     task.updatedAt = new Date().toISOString();
+    markTaskDirty(task.id);
+    if (oldStatus !== task.status) {
+        logActivity('status', `"${task.taskTitle}" ${oldStatus} → ${task.status}`);
+    } else {
+        logActivity('edit', `"${task.taskTitle}" edited`);
+    }
     saveToLocalStorage();
     showToast('Task updated', 'success');
     closeEditTaskModal();
@@ -471,6 +538,8 @@ function deleteTaskById(taskId) {
     const undoTimer = setTimeout(() => {
         // Undo window expired → finalize deletion
         addTombstone(taskId);
+        markTaskDirty(taskId);
+        logActivity('delete', `"${removedTask.taskTitle}" by ${removedTask.person.split(' ')[0]} deleted`);
         saveToLocalStorage(); // this triggers sync
         updateTabBadges();
     }, 10000);
@@ -653,8 +722,9 @@ function executeRepeat() {
         if (!weekLabel) continue; // outside generated week range
 
         const now = new Date().toISOString();
+        const rid = newTaskId();
         tasks.push({
-            id: newTaskId(),
+            id: rid,
             person: task.person,
             week: weekLabel,
             project: task.project,
@@ -664,13 +734,16 @@ function executeRepeat() {
             status: 'Not Started',
             comments: '',
             observerComments: [],
+            links: task.links ? task.links.slice() : [],
             createdAt: now,
             updatedAt: now
         });
+        markTaskDirty(rid);
         created++;
     }
 
     if (created > 0) {
+        logActivity('repeat', `"${task.taskTitle}" repeated ${created}x (${freq})`);
         saveToLocalStorage();
         showToast(`Created ${created} recurring task(s)`, 'success');
         applyFilters();

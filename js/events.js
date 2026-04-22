@@ -123,11 +123,11 @@ function renderCalendar() {
         const color = getMemberColor(person, pIdx);
         const personEvts = events.filter(e => e.person === person);
 
-        // Background grid cells
-        const bgCells = dates.map(d => {
+        // Background grid cells (with data attributes for drop targeting)
+        const bgCells = dates.map((d, di) => {
             const isToday = d.getTime() === today.getTime();
             const isWE = d.getDay() === 0 || d.getDay() === 6;
-            return `<div class="cal-cell ${isToday ? 'cal-today-bg' : ''} ${isWE ? 'cal-we-bg' : ''}"></div>`;
+            return `<div class="cal-cell cal-drop-target ${isToday ? 'cal-today-bg' : ''} ${isWE ? 'cal-we-bg' : ''}" data-date-idx="${di}" data-person="${person}"></div>`;
         }).join('');
 
         // Event blocks positioned via left% and width%
@@ -150,6 +150,9 @@ function renderCalendar() {
             const loc = evt.location ? ' · ' + evt.location : '';
 
             evtBlocks += `<div class="cal-evt"
+                draggable="true"
+                data-event-id="${evt.id}"
+                data-orig-start-col="${cs}"
                 style="left:${leftPct}%;width:${widthPct}%;background:${evtColor};"
                 title="${evt.title}${loc}"
                 onclick="showEventDetail('${evt.id}')">
@@ -157,9 +160,9 @@ function renderCalendar() {
             </div>`;
         });
 
-        swimRows += `<div class="cal-swim-row">
+        swimRows += `<div class="cal-swim-row" data-person="${person}">
             <div class="cal-label" style="border-left:3px solid ${color};">${person.split(' ')[0]}</div>
-            <div class="cal-lane">
+            <div class="cal-lane" data-person="${person}">
                 <div class="cal-lane-bg">${bgCells}</div>
                 ${evtBlocks}
             </div>
@@ -190,6 +193,93 @@ function renderCalendar() {
             </div>
         </div>
     `;
+
+    // --- Wire drag-and-drop ---
+    _wireDragAndDrop(container, dates, people);
+}
+
+function _wireDragAndDrop(container, dates, people) {
+    let _dragEventId = null;
+    let _dragOrigStartCol = 0;
+
+    // Dragstart on event blocks
+    container.querySelectorAll('.cal-evt[draggable]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            _dragEventId = el.dataset.eventId;
+            _dragOrigStartCol = parseInt(el.dataset.origStartCol) || 0;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', _dragEventId);
+            el.style.opacity = '0.5';
+            // Prevent the click handler from firing after drag
+            el._isDragging = true;
+        });
+        el.addEventListener('dragend', e => {
+            el.style.opacity = '1';
+            // Remove all drop highlights
+            container.querySelectorAll('.cal-drop-highlight').forEach(c => c.classList.remove('cal-drop-highlight'));
+            setTimeout(() => { el._isDragging = false; }, 100);
+        });
+        // Override click to not fire after drag
+        const origOnclick = el.getAttribute('onclick');
+        el.removeAttribute('onclick');
+        el.addEventListener('click', e => {
+            if (el._isDragging) { e.stopPropagation(); return; }
+            // Re-execute the original onclick
+            if (origOnclick) new Function(origOnclick).call(el);
+        });
+    });
+
+    // Dragover/drop on lane cells
+    container.querySelectorAll('.cal-drop-target').forEach(cell => {
+        cell.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            cell.classList.add('cal-drop-highlight');
+        });
+        cell.addEventListener('dragleave', e => {
+            cell.classList.remove('cal-drop-highlight');
+        });
+        cell.addEventListener('drop', e => {
+            e.preventDefault();
+            cell.classList.remove('cal-drop-highlight');
+            const eventId = e.dataTransfer.getData('text/plain');
+            if (!eventId) return;
+
+            const dropDateIdx = parseInt(cell.dataset.dateIdx);
+            const dropPerson = cell.dataset.person;
+            if (isNaN(dropDateIdx)) return;
+
+            const evt = events.find(ev => ev.id === eventId);
+            if (!evt) return;
+
+            // Permission check
+            const canEdit = currentUser.role === 'admin' || evt.createdBy === currentUser.name;
+            if (!canEdit) { showToast('You can only move your own events', 'error'); return; }
+
+            // Calculate date shift
+            const shift = dropDateIdx - _dragOrigStartCol;
+            if (shift === 0 && dropPerson === evt.person) return; // no change
+
+            // Apply date shift
+            const oldStart = new Date(evt.startDate + 'T00:00:00');
+            const oldEnd = new Date(evt.endDate + 'T00:00:00');
+            oldStart.setDate(oldStart.getDate() + shift);
+            oldEnd.setDate(oldEnd.getDate() + shift);
+            evt.startDate = toDateStr(oldStart);
+            evt.endDate = toDateStr(oldEnd);
+
+            // Apply person change if dropped on different row
+            if (dropPerson && dropPerson !== evt.person) {
+                logActivity('edit', `Event "${evt.title}" reassigned from ${evt.person.split(' ')[0]} to ${dropPerson.split(' ')[0]}`);
+                evt.person = dropPerson;
+            }
+
+            logActivity('edit', `Event "${evt.title}" moved to ${evt.startDate}`);
+            saveEventsToLocalStorage();
+            renderCalendar();
+            showToast('Event moved', 'success');
+        });
+    });
 }
 
 // --- Event Detail / Delete ---

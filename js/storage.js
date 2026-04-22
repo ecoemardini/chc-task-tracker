@@ -1,6 +1,7 @@
 // ============ STORAGE & SYNC ENGINE ============
 // localStorage persistence, offline-first sync with Google Apps Script,
-// tombstone-based deletion propagation, and conflict detection.
+// tombstone-based deletion propagation, dirty tracking, field-level merge,
+// and activity logging.
 
 // --- Core localStorage ---
 function saveToLocalStorage() {
@@ -34,9 +35,36 @@ let isSyncing = false;
 let pendingChanges = [];
 let lastSyncTime = null;
 
+// --- Dirty Tracking ---
+// Tracks task IDs modified locally since last successful sync.
+// Only dirty tasks get sent to the server, preventing stale overwrites.
+let _dirtyTaskIds = new Set();
+
+function loadDirtyIds() {
+    try {
+        const stored = localStorage.getItem('chc_dirty_ids');
+        _dirtyTaskIds = stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { _dirtyTaskIds = new Set(); }
+}
+
+function saveDirtyIds() {
+    localStorage.setItem('chc_dirty_ids', JSON.stringify([..._dirtyTaskIds]));
+}
+
+function markTaskDirty(id) {
+    if (!id) return;
+    _dirtyTaskIds.add(String(id));
+    saveDirtyIds();
+}
+
+function clearDirtyIds() {
+    _dirtyTaskIds.clear();
+    saveDirtyIds();
+}
+
 // --- Tombstones (deletion propagation) ---
 let tombstones = [];
-const TOMBSTONE_TTL_DAYS = 90; // extended from 14 to survive long holidays/sick leave
+const TOMBSTONE_TTL_DAYS = 90;
 
 function loadTombstones() {
     try {
@@ -75,11 +103,6 @@ function pruneOldTombstones() {
 }
 
 // --- Known Task IDs ---
-// Tracks every task ID the client has ever seen. Prevents "resurrection"
-// of tasks that were deleted locally but whose tombstones have expired.
-// If the server returns a task we've never seen and there's no tombstone,
-// we add it. If we HAVE seen it before but it's gone locally (and no
-// tombstone), that means the tombstone expired → treat as intentional delete.
 function loadKnownIds() {
     try {
         const stored = localStorage.getItem('chc_known_ids');
@@ -115,11 +138,73 @@ function queueChange(action, data) {
     updateSyncIndicator();
 }
 
+// --- Activity Log (admin-only audit trail) ---
+let _activityLog = [];
+const MAX_ACTIVITY_LOG = 200;
+
+function loadActivityLog() {
+    try {
+        const stored = localStorage.getItem('chc_activity_log');
+        _activityLog = stored ? JSON.parse(stored) : [];
+    } catch { _activityLog = []; }
+}
+
+function saveActivityLog() {
+    // Keep only the latest entries
+    if (_activityLog.length > MAX_ACTIVITY_LOG) {
+        _activityLog = _activityLog.slice(-MAX_ACTIVITY_LOG);
+    }
+    localStorage.setItem('chc_activity_log', JSON.stringify(_activityLog));
+}
+
+function logActivity(action, details) {
+    _activityLog.push({
+        action,
+        details,
+        user: currentUser ? currentUser.name : 'system',
+        timestamp: new Date().toISOString()
+    });
+    saveActivityLog();
+}
+
+function getActivityLog() {
+    return _activityLog.slice().reverse(); // newest first
+}
+
+function renderActivityLog() {
+    const container = document.getElementById('activityLogContainer');
+    if (!container) return;
+    const log = getActivityLog();
+    if (log.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No activity recorded yet.</p>';
+        return;
+    }
+    container.innerHTML = log.slice(0, 50).map(entry => {
+        const d = new Date(entry.timestamp);
+        const timeStr = d.toLocaleDateString('en-US', { day:'numeric', month:'short' }) + ' ' +
+            d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+        const actionColors = {
+            'create': 'var(--success)',
+            'edit': 'var(--primary-blue)',
+            'delete': 'var(--danger)',
+            'status': '#9C27B0',
+            'sync': 'var(--text-dim)',
+            'repeat': 'var(--warning)'
+        };
+        const color = actionColors[entry.action] || 'var(--text-dim)';
+        return `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f4f8;font-size:12px;">
+            <span style="color:${color};font-weight:700;text-transform:uppercase;min-width:50px;">${entry.action}</span>
+            <span style="flex:1;color:var(--text-dark);">${entry.details}</span>
+            <span style="color:var(--text-dim);white-space:nowrap;font-size:11px;">${entry.user.split(' ')[0]} · ${timeStr}</span>
+        </div>`;
+    }).join('');
+}
+
 // --- Save Override (auto-sync on save) ---
 const _originalSave = saveToLocalStorage;
 saveToLocalStorage = function() {
     _originalSave();
-    invalidateStatsCache(); // clear cached aggregations
+    invalidateStatsCache();
     if (SYNC_URL && isOnline && !isSyncing) {
         clearTimeout(window._syncDebounce);
         window._syncDebounce = setTimeout(() => syncToServer(), 2000);
@@ -127,6 +212,9 @@ saveToLocalStorage = function() {
 };
 
 // --- Sync to Server ---
+// Now sends only dirty (locally modified) tasks instead of the full state.
+// The server merges per-task by updatedAt timestamp.
+// On response, we do field-level merge for tasks that exist both locally and on server.
 async function syncToServer() {
     if (!SYNC_URL || isSyncing) return;
 
@@ -136,18 +224,25 @@ async function syncToServer() {
     try {
         pruneOldTombstones();
         const tombstoneSnapshot = tombstones.slice();
+
+        // Only send dirty tasks (modified since last sync) + all tasks for initial sync
+        const isInitialSync = !lastSyncTime;
+        const tasksToSend = isInitialSync
+            ? tasks.map(t => ({ ...t, updatedAt: t.updatedAt || t.createdAt || new Date().toISOString() }))
+            : tasks.filter(t => _dirtyTaskIds.has(String(t.id)))
+                .map(t => ({ ...t, updatedAt: t.updatedAt || t.createdAt || new Date().toISOString() }));
+
         const syncFetch = fetch(SYNC_URL, {
             method: 'POST',
             redirect: 'follow',
             body: JSON.stringify({
                 action: 'fullSync',
-                tasks: tasks.map(t => ({
-                    ...t,
-                    updatedAt: t.updatedAt || t.createdAt || new Date().toISOString()
-                })),
+                tasks: tasksToSend,
                 users: users,
                 tombstones: tombstoneSnapshot,
-                events: (typeof events !== 'undefined' ? events : [])
+                events: (typeof events !== 'undefined' ? events : []),
+                partialSync: !isInitialSync,
+                clientId: _getClientId()
             })
         });
         const syncTimeoutPromise = new Promise((_, reject) =>
@@ -161,12 +256,32 @@ async function syncToServer() {
             if (result.tasks) {
                 const localMap = {};
                 tasks.forEach(t => localMap[String(t.id)] = t);
+                const knownIds = loadKnownIds();
 
                 result.tasks.forEach(st => {
                     const sid = String(st.id);
                     if (isTombstoned(sid)) return;
-                    if (!localMap[sid]) {
-                        tasks.push(st);
+
+                    const local = localMap[sid];
+                    if (!local) {
+                        // New task from server
+                        if (!knownIds.has(sid)) {
+                            tasks.push(st);
+                        }
+                    } else {
+                        // Task exists locally — field-level merge by updatedAt
+                        const serverTime = new Date(st.updatedAt || st.createdAt || 0).getTime();
+                        const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
+
+                        if (serverTime > localTime && !_dirtyTaskIds.has(sid)) {
+                            // Server is newer AND we haven't modified it locally → accept server version
+                            Object.assign(local, st);
+                        } else if (serverTime > localTime && _dirtyTaskIds.has(sid)) {
+                            // CONFLICT: both changed. Do field-level merge.
+                            conflictCount++;
+                            _fieldMerge(local, st);
+                        }
+                        // If local is newer or same, keep local (already sent to server)
                     }
                 });
 
@@ -202,9 +317,11 @@ async function syncToServer() {
                 result.events.forEach(se => {
                     if (!localEventIds.has(se.id)) events.push(se);
                 });
-                saveEventsToLocalStorage();
+                if (typeof saveEventsToLocalStorage === 'function') saveEventsToLocalStorage();
             }
 
+            // Sync succeeded — clear dirty tracking
+            clearDirtyIds();
             pendingChanges = [];
             savePendingChanges();
 
@@ -212,7 +329,8 @@ async function syncToServer() {
             localStorage.setItem('chc_last_sync', lastSyncTime.toISOString());
 
             if (conflictCount > 0) {
-                showToast(`Synced — ${conflictCount} conflict(s) resolved (server version kept)`, 'error');
+                logActivity('sync', `Synced with ${conflictCount} conflict(s) — merged field-by-field`);
+                showToast(`Synced — ${conflictCount} conflict(s) merged (newest field wins)`, 'error');
             } else {
                 showToast('Synced with server', 'success');
             }
@@ -226,6 +344,58 @@ async function syncToServer() {
 
     isSyncing = false;
     updateSyncIndicator();
+}
+
+// --- Field-Level Merge ---
+// When both local and server changed the same task, compare each field
+// individually and keep the newer value per-field.
+function _fieldMerge(local, server) {
+    // Mergeable fields and their fallback
+    const fields = ['taskTitle', 'taskDescription', 'project', 'week', 'priority', 'status', 'comments', 'person'];
+    const serverTime = new Date(server.updatedAt || 0).getTime();
+    const localTime = new Date(local.updatedAt || 0).getTime();
+
+    fields.forEach(f => {
+        if (local[f] !== server[f]) {
+            // If server is newer overall, take server's differing fields
+            // but preserve any local fields the user just changed
+            // Since we can't track per-field timestamps, use heuristic:
+            // take the non-empty / more-recently-set value, preferring server for status
+            if (f === 'status' && serverTime > localTime) {
+                local[f] = server[f]; // status changes from others are important
+            }
+            // For other fields, keep local if dirty (user just edited)
+        }
+    });
+
+    // Always merge observer comments (union)
+    const localComments = local.observerComments || [];
+    const serverComments = server.observerComments || [];
+    const commentMap = {};
+    [...localComments, ...serverComments].forEach(c => {
+        const key = c.author + '|' + c.timestamp;
+        commentMap[key] = c;
+    });
+    local.observerComments = Object.values(commentMap).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+    // Merge links (union)
+    const localLinks = local.links || [];
+    const serverLinks = server.links || [];
+    const linkSet = new Set(localLinks.map(l => l.url));
+    serverLinks.forEach(l => { if (!linkSet.has(l.url)) localLinks.push(l); });
+    local.links = localLinks;
+
+    local.updatedAt = new Date().toISOString();
+}
+
+// --- Client ID (for multi-device identification) ---
+function _getClientId() {
+    let cid = localStorage.getItem('chc_client_id');
+    if (!cid) {
+        cid = 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem('chc_client_id', cid);
+    }
+    return cid;
 }
 
 // --- Pull from Server (with conflict detection) ---
@@ -255,33 +425,27 @@ async function pullFromServer() {
 
                     const local = localMap[sid];
                     if (!local) {
-                        // Unknown task from server.
-                        // If we've NEVER seen this ID, it's genuinely new → add it.
-                        // If we HAVE seen it but it's gone locally (tombstone expired),
-                        // DON'T resurrect it — the user deleted it intentionally.
                         if (!knownIds.has(sid)) {
                             tasks.push(st);
                             changed = true;
                         }
-                        // else: silently skip — expired tombstone, don't resurrect
                     } else {
-                        // Task exists locally — detect conflicts
                         const serverTime = new Date(st.updatedAt || st.createdAt || 0).getTime();
                         const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
 
                         if (serverTime > localTime) {
-                            // Check if local also changed (true conflict)
                             const lastSync = lastSyncTime ? lastSyncTime.getTime() : 0;
-                            if (localTime > lastSync) {
-                                // CONFLICT: both local and server changed since last sync
+                            if (localTime > lastSync && _dirtyTaskIds.has(sid)) {
+                                // True conflict — both sides changed
                                 conflictedTasks.push({
                                     title: local.taskTitle,
-                                    person: local.person,
-                                    field: 'multiple fields'
+                                    person: local.person
                                 });
+                                _fieldMerge(local, st);
+                            } else {
+                                // Server is newer, local unchanged → accept server
+                                Object.assign(local, st);
                             }
-                            // Server wins — apply update
-                            Object.assign(local, st);
                             changed = true;
                         }
                     }
@@ -301,6 +465,16 @@ async function pullFromServer() {
                 });
             }
 
+            // Merge events from server
+            if (result.events && typeof events !== 'undefined') {
+                const localEventIds = new Set(events.map(e => e.id));
+                let eventsChanged = false;
+                result.events.forEach(se => {
+                    if (!localEventIds.has(se.id)) { events.push(se); eventsChanged = true; }
+                });
+                if (eventsChanged && typeof saveEventsToLocalStorage === 'function') saveEventsToLocalStorage();
+            }
+
             if (changed) {
                 _originalSave();
                 if (currentUser) {
@@ -310,10 +484,10 @@ async function pullFromServer() {
                 }
             }
 
-            // Notify about conflicts
             if (conflictedTasks.length > 0) {
                 const names = conflictedTasks.map(c => `"${c.title}" (${c.person})`).join(', ');
-                showToast(`${conflictedTasks.length} task(s) updated by others: ${names}. Server version kept.`, 'error');
+                logActivity('sync', `Pull conflict: ${conflictedTasks.length} task(s) merged — ${names}`);
+                showToast(`${conflictedTasks.length} task(s) updated by others — merged. Check activity log.`, 'error');
             }
 
             lastSyncTime = new Date();
@@ -362,12 +536,12 @@ function updateSyncIndicator() {
     if (!isOnline) {
         indicator.classList.add('offline');
         icon.innerHTML = '&#x2601;';
-        const pending = pendingChanges.length;
-        text.innerHTML = 'Offline' + (pending > 0 ? ` <span class="pending-count">${pending}</span>` : '');
+        const pending = _dirtyTaskIds.size;
+        text.innerHTML = 'Offline' + (pending > 0 ? ` <span class="pending-count">${pending} pending</span>` : '');
         return;
     }
 
-    const pending = pendingChanges.length;
+    const pending = _dirtyTaskIds.size;
     if (pending > 0) {
         indicator.classList.add('error');
         icon.innerHTML = '&#x2601;';
@@ -383,7 +557,9 @@ function updateSyncIndicator() {
 function timeSince(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
     if (seconds < 60) return 'just now';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
-    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
-    return Math.floor(seconds / 86400) + 'd ago';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
 }

@@ -3,7 +3,7 @@
  * Enables offline-first operation with background sync
  */
 
-const CACHE_NAME = 'chc-task-tracker-v3';
+const CACHE_NAME = 'chc-task-tracker-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
