@@ -131,38 +131,65 @@ function renderCalendar() {
         }).join('');
 
         // Event blocks positioned via left% and width%
-        let evtBlocks = '';
-        personEvts.forEach(evt => {
-            const evtStart = new Date(evt.startDate + 'T00:00:00');
-            const evtEnd = new Date(evt.endDate + 'T00:00:00');
-            const startCol = daysBetween(calendarViewStart, evtStart);
-            const endCol = daysBetween(calendarViewStart, evtEnd);
-
+        // First, compute visible ranges and assign rows to avoid overlaps
+        var visibleEvts = [];
+        personEvts.forEach(function(evt) {
+            var evtStart = new Date(evt.startDate + 'T00:00:00');
+            var evtEnd = new Date(evt.endDate + 'T00:00:00');
+            var startCol = daysBetween(calendarViewStart, evtStart);
+            var endCol = daysBetween(calendarViewStart, evtEnd);
             if (endCol < 0 || startCol >= N) return;
+            var cs = Math.max(0, startCol);
+            var ce = Math.min(N - 1, endCol);
+            visibleEvts.push({ evt: evt, cs: cs, ce: ce });
+        });
 
-            const cs = Math.max(0, startCol);
-            const ce = Math.min(N - 1, endCol);
-            const leftPct = (cs / N * 100).toFixed(2);
-            const widthPct = ((ce - cs + 1) / N * 100).toFixed(2);
+        // Sort by start col, then by width descending (longer events first)
+        visibleEvts.sort(function(a, b) { return a.cs - b.cs || (b.ce - b.cs) - (a.ce - a.cs); });
 
-            const evtColor = projectColors[evt.project] || color;
-            const logo = projectLogoHTML(evt.project, 14);
-            const loc = evt.location ? ' · ' + evt.location : '';
+        // Assign rows: each event goes in the first row where it doesn't overlap
+        var rows = []; // rows[r] = array of {cs, ce} intervals in that row
+        visibleEvts.forEach(function(ve) {
+            var placed = false;
+            for (var r = 0; r < rows.length; r++) {
+                var overlap = false;
+                for (var ri = 0; ri < rows[r].length; ri++) {
+                    if (ve.cs <= rows[r][ri].ce && ve.ce >= rows[r][ri].cs) { overlap = true; break; }
+                }
+                if (!overlap) { rows[r].push({ cs: ve.cs, ce: ve.ce }); ve.row = r; placed = true; break; }
+            }
+            if (!placed) { ve.row = rows.length; rows.push([{ cs: ve.cs, ce: ve.ce }]); }
+        });
 
-            evtBlocks += `<div class="cal-evt"
-                draggable="true"
-                data-event-id="${evt.id}"
-                data-orig-start-col="${cs}"
-                style="left:${leftPct}%;width:${widthPct}%;background:${evtColor};"
-                title="${evt.title}${loc}"
-                onclick="showEventDetail('${evt.id}')">
-                ${logo}<span class="cal-evt-txt">${evt.title}${loc}</span>
-            </div>`;
+        var totalRows = Math.max(1, rows.length);
+        var evtHeight = 22; // px per event row
+        var laneMinHeight = totalRows * (evtHeight + 2) + 4; // dynamic lane height
+
+        let evtBlocks = '';
+        visibleEvts.forEach(function(ve) {
+            var evt = ve.evt;
+            var leftPct = (ve.cs / N * 100).toFixed(2);
+            var widthPct = ((ve.ce - ve.cs + 1) / N * 100).toFixed(2);
+            var topPx = ve.row * (evtHeight + 2) + 2;
+
+            var evtColor = projectColors[evt.project] || color;
+            var logo = projectLogoHTML(evt.project, 14);
+            var loc = evt.location ? ' \u00b7 ' + evt.location : '';
+
+            evtBlocks += '<div class="cal-evt"' +
+                ' draggable="true"' +
+                ' data-event-id="' + evt.id + '"' +
+                ' data-orig-start-col="' + ve.cs + '"' +
+                ' style="left:' + leftPct + '%;width:' + widthPct + '%;top:' + topPx + 'px;height:' + evtHeight + 'px;background:' + evtColor + ';"' +
+                ' title="' + evt.title + loc + '"' +
+                ' onclick="showEventDetail(\'' + evt.id + '\')">' +
+                logo + '<span class="cal-evt-txt">' + evt.title + loc + '</span>' +
+            '</div>';
         });
 
         swimRows += `<div class="cal-swim-row" data-person="${person}">
             <div class="cal-label" style="border-left:3px solid ${color};">${person.split(' ')[0]}</div>
-            <div class="cal-lane" data-person="${person}">
+            <div class="cal-lane" data-person="${person}" style="min-height:${laneMinHeight}px;">
                 <div class="cal-lane-bg">${bgCells}</div>
                 ${evtBlocks}
             </div>
