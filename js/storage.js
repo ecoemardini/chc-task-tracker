@@ -4,7 +4,7 @@
 
 // --- Core localStorage ---
 function saveToLocalStorage() {
-    const data = { tasks, projects, taskCategories, users, weeks, projectColors };
+    const data = { tasks, projects, taskCategories, users, weeks, projectColors, events: (typeof events !== 'undefined' ? events : []) };
     localStorage.setItem('chc_task_logger_v2', JSON.stringify(data));
 }
 
@@ -19,6 +19,7 @@ function loadFromLocalStorage() {
             users = data.users || users;
             weeks = data.weeks || weeks;
             Object.assign(projectColors, data.projectColors || {});
+            if (typeof events !== 'undefined' && data.events) events = data.events;
         } catch (err) {
             console.error('Failed to load data:', err);
         }
@@ -145,7 +146,8 @@ async function syncToServer() {
                     updatedAt: t.updatedAt || t.createdAt || new Date().toISOString()
                 })),
                 users: users,
-                tombstones: tombstoneSnapshot
+                tombstones: tombstoneSnapshot,
+                events: (typeof events !== 'undefined' ? events : [])
             })
         });
         const syncTimeoutPromise = new Promise((_, reject) =>
@@ -192,6 +194,15 @@ async function syncToServer() {
                     }
                 });
                 if (usersChanged) _originalSave();
+            }
+
+            // Merge events from server
+            if (result.events && typeof events !== 'undefined') {
+                const localEventIds = new Set(events.map(e => e.id));
+                result.events.forEach(se => {
+                    if (!localEventIds.has(se.id)) events.push(se);
+                });
+                saveEventsToLocalStorage();
             }
 
             pendingChanges = [];

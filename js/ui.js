@@ -44,7 +44,9 @@ function switchTab(tabName) {
     const clickedTab = document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
     if (clickedTab) clickedTab.classList.add('active');
 
-    if (tabName === 'log-task') {
+    if (tabName === 'dashboard') {
+        updateDashboard();
+    } else if (tabName === 'log-task') {
         initSpreadsheet();
     } else if (tabName === 'overview') {
         updateOverview();
@@ -56,6 +58,8 @@ function switchTab(tabName) {
         updateTimelineTab();
     } else if (tabName === 'all-tasks') {
         updateAllTasksTab();
+    } else if (tabName === 'calendar') {
+        updateCalendarTab();
     } else if (tabName === 'settings') {
         updateSettingsTab();
     }
@@ -87,6 +91,6 @@ function populateUserSelect() {
 
 // --- Initialize App UI ---
 function initializeApp() {
-    initSpreadsheet();
+    updateDashboard();
     updateTabBadges();
 }

@@ -3,7 +3,7 @@
  * Enables offline-first operation with background sync
  */
 
-const CACHE_NAME = 'chc-task-tracker-v2';
+const CACHE_NAME = 'chc-task-tracker-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const ASSETS_TO_CACHE = [
   './js/storage.js',
   './js/ui.js',
   './js/tasks.js',
+  './js/events.js',
   './js/charts.js',
   './js/app.js',
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap',

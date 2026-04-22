@@ -848,6 +848,59 @@
             margin-bottom: 20px;
         }
 
+        /* ---- Calendar Swimlane ---- */
+        .cal-container {
+            overflow-x: auto;
+            border: 1px solid #e0e7f1;
+            border-radius: var(--radius-card);
+            background: var(--surface-white);
+        }
+        .cal-scroll { min-width: 900px; }
+        .cal-header-row { display: flex; }
+        .cal-label-spacer { width: 100px; min-width: 100px; flex-shrink: 0; }
+        .cal-hstrip { display: flex; flex: 1; }
+        .cal-hcell {
+            text-align: center; padding: 4px 2px; font-size: 12px; font-weight: 600;
+            border-right: 1px solid rgba(255,255,255,0.15);
+        }
+        .cal-month-row { background: var(--dark-navy); color: white; }
+        .cal-day-hdr { background: #f0f4f8; border-bottom: 2px solid #e0e7f1; }
+        .cal-dcell { flex: 1; text-align: center; padding: 3px 0; border-right: 1px solid #e0e7f1; }
+        .cal-dn { font-size: 10px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; }
+        .cal-dd { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+        .cal-dcell.cal-today { background: var(--primary-blue); }
+        .cal-dcell.cal-today .cal-dn, .cal-dcell.cal-today .cal-dd { color: white; }
+        .cal-dcell.cal-we { background: #f8f0e8; }
+
+        .cal-swim-row { display: flex; border-bottom: 1px solid #e0e7f1; }
+        .cal-label {
+            width: 100px; min-width: 100px; flex-shrink: 0;
+            padding: 8px 10px; font-size: 13px; font-weight: 600;
+            color: var(--dark-navy); display: flex; align-items: center;
+        }
+        .cal-lane { flex: 1; position: relative; min-height: 44px; }
+        .cal-lane-bg { display: flex; height: 100%; }
+        .cal-cell { flex: 1; border-right: 1px solid #f0f4f8; }
+        .cal-today-bg { background: rgba(0,174,239,0.06); }
+        .cal-we-bg { background: rgba(255,169,77,0.05); }
+
+        .cal-evt {
+            position: absolute; top: 6px; height: 30px; border-radius: 6px;
+            color: white; font-size: 11px; font-weight: 600;
+            display: flex; align-items: center; padding: 0 8px; gap: 4px;
+            cursor: pointer; overflow: hidden; white-space: nowrap;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: transform 0.15s, box-shadow 0.15s; z-index: 2;
+        }
+        .cal-evt:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+        .cal-evt-txt { overflow: hidden; text-overflow: ellipsis; }
+
+        .cal-today-line {
+            position: absolute; top: 0; bottom: 0; width: 2px;
+            background: var(--danger); z-index: 3; pointer-events: none;
+            margin-left: 100px; /* offset for label column */
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -1064,6 +1117,10 @@
                 flex-direction: column;
             }
 
+            #dashboard > div {
+                grid-template-columns: 1fr !important;
+            }
+
             .filter-group select,
             .filter-group input {
                 min-width: unset;
@@ -1124,18 +1181,58 @@
 
 <div id="mainContainer" class="container hidden">
     <div class="sidebar">
-        <button class="tab-btn active" onclick="switchTab('log-task')">+ Log Task <span class="tab-badge" id="badge-log-task">0</span></button>
+        <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('log-task')">+ Log Task <span class="tab-badge" id="badge-log-task">0</span></button>
         <button class="tab-btn" onclick="switchTab('all-tasks')">All Tasks <span class="tab-badge" id="badge-all-tasks">0</span></button>
         <button class="tab-btn" onclick="switchTab('overview')">Overview <span class="tab-badge" id="badge-overview">0</span></button>
         <button class="tab-btn" onclick="switchTab('team')">Team</button>
         <button class="tab-btn" onclick="switchTab('projects')">Projects</button>
         <button class="tab-btn" onclick="switchTab('timeline')">Timeline</button>
+        <button class="tab-btn" onclick="switchTab('calendar')">Calendar</button>
         <button class="tab-btn" id="settingsTab" onclick="switchTab('settings')">Settings</button>
     </div>
 
     <div class="main">
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <h2 class="section-title" id="dashGreeting">Welcome back</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                <!-- Personal Panel -->
+                <div>
+                    <h3 style="font-size:16px;color:var(--dark-navy);margin-bottom:12px;">My Week</h3>
+                    <div class="kpi-cards" style="grid-template-columns:1fr 1fr;margin-bottom:16px;">
+                        <div class="kpi-card"><h3>My Tasks</h3><div class="value" id="dash-my-total">0</div></div>
+                        <div class="kpi-card"><h3>Completed</h3><div class="value" id="dash-my-done">0</div></div>
+                    </div>
+                    <div id="dashMyTasks" style="background:var(--surface-white);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:16px;margin-bottom:16px;">
+                        <p style="color:var(--text-dim);font-size:13px;">Loading...</p>
+                    </div>
+                    <div id="dashMyEvents" style="background:var(--surface-white);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:16px;">
+                        <h4 style="font-size:14px;margin-bottom:8px;color:var(--dark-navy);">My Upcoming Events</h4>
+                        <div id="dashMyEventsList"><p style="color:var(--text-dim);font-size:13px;">No upcoming events</p></div>
+                    </div>
+                </div>
+                <!-- Team Panel -->
+                <div>
+                    <h3 style="font-size:16px;color:var(--dark-navy);margin-bottom:12px;">Team Overview</h3>
+                    <div class="kpi-cards" style="grid-template-columns:1fr 1fr;margin-bottom:16px;">
+                        <div class="kpi-card"><h3>Total Tasks</h3><div class="value" id="dash-team-total">0</div></div>
+                        <div class="kpi-card"><h3>In Progress</h3><div class="value" id="dash-team-ip">0</div></div>
+                    </div>
+                    <div id="dashTeamActivity" style="background:var(--surface-white);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:16px;margin-bottom:16px;">
+                        <h4 style="font-size:14px;margin-bottom:8px;color:var(--dark-navy);">Who's Doing What</h4>
+                        <div id="dashTeamList"><p style="color:var(--text-dim);font-size:13px;">Loading...</p></div>
+                    </div>
+                    <div id="dashTeamEvents" style="background:var(--surface-white);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:16px;">
+                        <h4 style="font-size:14px;margin-bottom:8px;color:var(--dark-navy);">Upcoming Team Events</h4>
+                        <div id="dashTeamEventsList"><p style="color:var(--text-dim);font-size:13px;">No upcoming events</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Log Task Tab -->
-        <div id="log-task" class="tab-content active">
+        <div id="log-task" class="tab-content">
             <h2 class="section-title">Log New Task</h2>
             <div class="button-group">
                 <button class="btn btn-primary" onclick="addSpreadsheetRow()">+ Add Row</button>
@@ -1338,6 +1435,21 @@
             </table>
         </div>
 
+        <!-- Calendar Tab -->
+        <div id="calendar" class="tab-content">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+                <h2 class="section-title" style="margin-bottom:0;">Team Calendar</h2>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="navigateCalendar('prev')">◀ Prev</button>
+                    <button class="btn btn-primary btn-sm" onclick="navigateCalendar('today')">Today</button>
+                    <button class="btn btn-secondary btn-sm" onclick="navigateCalendar('next')">Next ▶</button>
+                    <span id="calendarRangeLabel" style="font-size:13px;color:var(--text-dim);min-width:200px;text-align:center;"></span>
+                    <button class="btn btn-success btn-sm" onclick="openAddEventModal()">+ Add Event</button>
+                </div>
+            </div>
+            <div class="cal-container" id="calendarSwimlane"></div>
+        </div>
+
         <!-- Settings Tab (Admin Only) -->
         <div id="settings" class="tab-content">
             <h2 class="section-title">Settings</h2>
@@ -1480,6 +1592,88 @@
     </div>
 </div>
 
+<!-- Repeat Task Modal -->
+<div id="repeatModal" class="modal">
+    <div class="modal-content" style="max-width:380px;">
+        <div class="modal-header">
+            <span>Repeat Task</span>
+            <button class="modal-close" onclick="closeRepeatModal()">×</button>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+            <div class="form-field">
+                <label>Frequency</label>
+                <select id="repeatFrequency">
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Every 2 Weeks</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>How many times?</label>
+                <input type="number" id="repeatCount" value="4" min="1" max="52">
+            </div>
+            <p style="font-size:12px;color:var(--text-dim);">Creates copies of this task for the next N weeks/periods. Each copy starts as "Not Started".</p>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-success" onclick="executeRepeat()">Create Copies</button>
+                <button class="btn btn-secondary" onclick="closeRepeatModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Event Modal -->
+<div id="addEventModal" class="modal">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <span>Add Event</span>
+            <button class="modal-close" onclick="closeAddEventModal()">×</button>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+            <div class="form-field">
+                <label>Event Title</label>
+                <input type="text" id="eventTitle" placeholder="e.g. Consortium Meeting, Fieldwork...">
+            </div>
+            <div class="form-field">
+                <label>Person</label>
+                <select id="eventPerson"></select>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <div class="form-field" style="flex:1;">
+                    <label>Start Date</label>
+                    <input type="date" id="eventStartDate">
+                </div>
+                <div class="form-field" style="flex:1;">
+                    <label>End Date</label>
+                    <input type="date" id="eventEndDate">
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Location</label>
+                <input type="text" id="eventLocation" placeholder="e.g. Sicily, Paphos, Online...">
+            </div>
+            <div class="form-field">
+                <label>Project</label>
+                <select id="eventProject"></select>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-success" onclick="saveNewEvent()">Add Event</button>
+                <button class="btn btn-secondary" onclick="closeAddEventModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Detail Modal -->
+<div id="eventDetailModal" class="modal">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <span>Event Details</span>
+            <button class="modal-close" onclick="closeEventDetailModal()">×</button>
+        </div>
+        <div id="eventDetailBody" style="padding:20px;"></div>
+    </div>
+</div>
+
 <div id="fileInput" style="display:none;">
     <input type="file" id="excelFileInput" accept=".xlsx,.xls" onchange="handleExcelImport()">
 </div>
@@ -1490,6 +1684,7 @@
 <script src="js/storage.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/tasks.js"></script>
+<script src="js/events.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/app.js"></script>
 

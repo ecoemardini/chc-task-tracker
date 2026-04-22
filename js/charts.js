@@ -427,3 +427,108 @@ function createStatusTrendChart() {
         }
     });
 }
+
+// --- Dashboard Landing Page ---
+function updateDashboard() {
+    if (!currentUser) return;
+    const curWeek = getCurrentWeek();
+    const me = currentUser.name;
+
+    // Greeting
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('dashGreeting').textContent = `${greeting}, ${me.split(' ')[0]}`;
+
+    // --- My tasks this week ---
+    const myTasks = tasks.filter(t => t.person === me && t.week === curWeek);
+    const myDone = myTasks.filter(t => t.status === 'Completed').length;
+    document.getElementById('dash-my-total').textContent = myTasks.length;
+    document.getElementById('dash-my-done').textContent = myDone;
+
+    const myTasksEl = document.getElementById('dashMyTasks');
+    if (myTasks.length === 0) {
+        myTasksEl.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No tasks this week. Head to <a href="#" onclick="switchTab(\'log-task\');return false;" style="color:var(--primary-blue);">Log Task</a> to add some.</p>';
+    } else {
+        myTasksEl.innerHTML = '<h4 style="font-size:14px;margin-bottom:8px;color:var(--dark-navy);">My Tasks This Week</h4>' +
+            myTasks.map(t => {
+                const statusColors = { 'Completed': 'var(--success)', 'In Progress': 'var(--primary-blue)', 'Not Started': 'var(--text-dim)' };
+                const statusIcon = t.status === 'Completed' ? '&#10003;' : t.status === 'In Progress' ? '&#9654;' : '&#9675;';
+                const projTag = t.project ? `<span class="project-tag" style="background:${projectColors[t.project]||'#999'};font-size:10px;padding:1px 6px;">${projectLogoHTML(t.project,12)}${t.project}</span>` : '';
+                return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f4f8;">
+                    <span style="color:${statusColors[t.status]||'#999'};font-size:14px;">${statusIcon}</span>
+                    <span style="flex:1;font-size:13px;${t.status==='Completed'?'text-decoration:line-through;color:var(--text-dim);':''}">${t.taskTitle}</span>
+                    ${projTag}
+                </div>`;
+            }).join('');
+    }
+
+    // --- My upcoming events ---
+    if (typeof loadEventsFromLocalStorage === 'function') loadEventsFromLocalStorage();
+    const todayStr = typeof toDateStr === 'function' ? toDateStr(new Date()) : new Date().toISOString().split('T')[0];
+    const myEvents = (typeof events !== 'undefined' ? events : []).filter(e => e.person === me && e.endDate >= todayStr)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .slice(0, 5);
+    const myEventsEl = document.getElementById('dashMyEventsList');
+    if (myEvents.length === 0) {
+        myEventsEl.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No upcoming events</p>';
+    } else {
+        myEventsEl.innerHTML = myEvents.map(e => {
+            const color = projectColors[e.project] || getMemberColor(me, 0);
+            const loc = e.location ? ` — ${e.location}` : '';
+            const fmtDate = typeof formatDateShort === 'function' ? formatDateShort : d => d.toLocaleDateString();
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;">
+                <div style="width:4px;height:28px;border-radius:2px;background:${color};flex-shrink:0;"></div>
+                <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:600;">${e.title}${loc}</div>
+                    <div style="font-size:11px;color:var(--text-dim);">${fmtDate(new Date(e.startDate+'T00:00:00'))} — ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // --- Team overview ---
+    const stats = getStats();
+    document.getElementById('dash-team-total').textContent = stats.total;
+    document.getElementById('dash-team-ip').textContent = stats.byStatus['In Progress'] || 0;
+
+    // Who's doing what this week
+    const teamList = document.getElementById('dashTeamList');
+    const teamMembers = users.filter(u => u.role !== 'observer');
+    teamList.innerHTML = teamMembers.map((u, idx) => {
+        const color = getMemberColor(u.name, idx);
+        const weekTasks = tasks.filter(t => t.person === u.name && t.week === curWeek);
+        const ipCount = weekTasks.filter(t => t.status === 'In Progress').length;
+        const doneCount = weekTasks.filter(t => t.status === 'Completed').length;
+        const totalW = weekTasks.length;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f4f8;">
+            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+            <span style="flex:1;font-size:13px;font-weight:600;">${u.name.split(' ')[0]}</span>
+            <span style="font-size:12px;color:var(--text-dim);">${totalW} task${totalW!==1?'s':''}</span>
+            ${ipCount > 0 ? `<span style="font-size:11px;background:rgba(0,174,239,0.15);color:var(--primary-blue);padding:1px 6px;border-radius:9999px;">${ipCount} active</span>` : ''}
+            ${doneCount > 0 ? `<span style="font-size:11px;background:rgba(0,196,160,0.15);color:var(--success);padding:1px 6px;border-radius:9999px;">${doneCount} done</span>` : ''}
+        </div>`;
+    }).join('');
+
+    // --- Team upcoming events ---
+    const allEvents = typeof events !== 'undefined' ? events : [];
+    const teamEvents = allEvents.filter(e => e.endDate >= todayStr)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .slice(0, 6);
+    const teamEventsEl = document.getElementById('dashTeamEventsList');
+    if (teamEvents.length === 0) {
+        teamEventsEl.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No upcoming events</p>';
+    } else {
+        const fmtDate = typeof formatDateShort === 'function' ? formatDateShort : d => d.toLocaleDateString();
+        teamEventsEl.innerHTML = teamEvents.map(e => {
+            const color = projectColors[e.project] || getMemberColor(e.person, 0);
+            const loc = e.location ? ` — ${e.location}` : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;">
+                <div style="width:4px;height:28px;border-radius:2px;background:${color};flex-shrink:0;"></div>
+                <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:600;">${e.title}${loc}</div>
+                    <div style="font-size:11px;color:var(--text-dim);">${e.person.split(' ')[0]} · ${fmtDate(new Date(e.startDate+'T00:00:00'))} — ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+}

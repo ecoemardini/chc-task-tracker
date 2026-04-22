@@ -9,6 +9,7 @@ function init() {
     document.getElementById('logoLogin').src = logoB64;
     document.getElementById('logoHeader').src = logoB64;
     loadFromLocalStorage();
+    loadEventsFromLocalStorage();
     populateUserSelect();
 
     const pinEl = document.getElementById('pinInput');

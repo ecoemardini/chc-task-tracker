@@ -396,6 +396,7 @@ function applyFilters() {
                     <td>
                         <div class="action-buttons">
                             ${_canEdit ? `<button class="btn btn-sm btn-primary" onclick="openEditTaskModal('${safeId}')">Edit</button>` : ''}
+                            ${_canEdit ? `<button class="btn btn-sm btn-secondary" onclick="openRepeatModal('${safeId}')" title="Repeat">&#x21bb;</button>` : ''}
                             ${_canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteTaskById('${safeId}')">Del</button>` : ''}
                             <button class="btn btn-sm btn-secondary" onclick="openCommentModal('${safeId}')">${commentCount > 0 ? '\ud83d\udcac' + commentCount : '\ud83d\udcac'}</button>
                         </div>
@@ -599,4 +600,130 @@ function addComment() {
     showToast('Comment added', 'success');
     document.getElementById('commentInput').value = '';
     openCommentModal(commentingTaskId);
+}
+
+// --- Repeat Task (Recurring) ---
+let repeatingTaskId = null;
+
+function openRepeatModal(taskId) {
+    repeatingTaskId = taskId;
+    document.getElementById('repeatFrequency').value = 'weekly';
+    document.getElementById('repeatCount').value = '4';
+    document.getElementById('repeatModal').classList.add('active');
+}
+
+function closeRepeatModal() {
+    document.getElementById('repeatModal').classList.remove('active');
+    repeatingTaskId = null;
+}
+
+function executeRepeat() {
+    const task = tasks.find(t => String(t.id) === String(repeatingTaskId));
+    if (!task) { closeRepeatModal(); return; }
+
+    const freq = document.getElementById('repeatFrequency').value;
+    const count = parseInt(document.getElementById('repeatCount').value) || 1;
+    if (count < 1 || count > 52) { showToast('Enter a count between 1 and 52', 'error'); return; }
+
+    // Parse the task's week to find a base date
+    // Week format: "20–24 Apr 2026" — we need the Monday date
+    const baseMonday = parseWeekToMonday(task.week);
+    if (!baseMonday) {
+        showToast('Could not parse the task week. Try a different task.', 'error');
+        closeRepeatModal();
+        return;
+    }
+
+    let created = 0;
+    for (let i = 1; i <= count; i++) {
+        const nextMonday = new Date(baseMonday);
+        if (freq === 'weekly') {
+            nextMonday.setDate(baseMonday.getDate() + 7 * i);
+        } else if (freq === 'biweekly') {
+            nextMonday.setDate(baseMonday.getDate() + 14 * i);
+        } else if (freq === 'monthly') {
+            nextMonday.setMonth(baseMonday.getMonth() + i);
+            // Snap to Monday
+            const day = nextMonday.getDay();
+            const diff = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
+            nextMonday.setDate(nextMonday.getDate() + diff);
+        }
+
+        const weekLabel = findWeekLabel(nextMonday);
+        if (!weekLabel) continue; // outside generated week range
+
+        const now = new Date().toISOString();
+        tasks.push({
+            id: newTaskId(),
+            person: task.person,
+            week: weekLabel,
+            project: task.project,
+            taskTitle: task.taskTitle,
+            taskDescription: task.taskDescription || '',
+            priority: task.priority,
+            status: 'Not Started',
+            comments: '',
+            observerComments: [],
+            createdAt: now,
+            updatedAt: now
+        });
+        created++;
+    }
+
+    if (created > 0) {
+        saveToLocalStorage();
+        showToast(`Created ${created} recurring task(s)`, 'success');
+        applyFilters();
+    } else {
+        showToast('No weeks matched — the date range may be outside the generated weeks.', 'error');
+    }
+    closeRepeatModal();
+}
+
+function parseWeekToMonday(weekStr) {
+    // Format: "20–24 Apr 2026" or "28 Apr–2 May 2026"
+    if (!weekStr) return null;
+    try {
+        // Try to extract the first day + month + year
+        const clean = weekStr.replace(/–/g, '-').replace(/—/g, '-');
+        const parts = clean.split('-');
+        const firstPart = parts[0].trim(); // "20" or "28 Apr"
+        const secondPart = parts[1].trim(); // "24 Apr 2026" or "2 May 2026"
+
+        // Extract month and year from the second part
+        const match2 = secondPart.match(/(\d+)\s+(\w+)\s+(\d{4})/);
+        if (!match2) return null;
+
+        const endMonth = match2[2];
+        const year = parseInt(match2[3]);
+
+        // First part might have its own month or just a number
+        const match1 = firstPart.match(/(\d+)\s*(\w*)/);
+        if (!match1) return null;
+
+        const startDay = parseInt(match1[1]);
+        const startMonth = match1[2] || endMonth;
+
+        const months = { 'Jan':0,'Feb':1,'Mar':2,'Apr':3,'May':4,'Jun':5,'Jul':6,'Aug':7,'Sep':8,'Oct':9,'Nov':10,'Dec':11 };
+        const monthIdx = months[startMonth];
+        if (monthIdx === undefined) return null;
+
+        return new Date(year, monthIdx, startDay);
+    } catch { return null; }
+}
+
+function findWeekLabel(date) {
+    // Find the week in `weeks` array that contains this date
+    // Weeks are like "20–24 Apr 2026"
+    for (const w of weeks) {
+        const mon = parseWeekToMonday(w);
+        if (!mon) continue;
+        // Check if dates are in the same week (Monday)
+        if (mon.getFullYear() === date.getFullYear() &&
+            mon.getMonth() === date.getMonth() &&
+            mon.getDate() === date.getDate()) {
+            return w;
+        }
+    }
+    return null;
 }
