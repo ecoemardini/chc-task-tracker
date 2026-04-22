@@ -1,185 +1,204 @@
 /**
- * Improved Google Apps Script — CHC Task Tracker Sync Engine
- * ============================================================
+ * Improved Google Apps Script — CHC Task Tracker Sync Engine v2
+ * ==============================================================
  *
- * DEPLOYMENT INSTRUCTIONS:
- * 1. Go to https://script.google.com
- * 2. Open your existing CHC Task Tracker project (or create a new one)
- * 3. Replace ALL contents of Code.gs with this file
- * 4. Click Deploy → Manage deployments → Edit → bump version → Deploy
- * 5. Copy the new Web App URL and paste it into js/storage.js as SYNC_URL
+ * DEPLOYMENT:
+ * 1. Go to script.google.com → open your project
+ * 2. Replace ALL code in Code.gs with this
+ * 3. Click Deploy → New deployment
+ * 4. Type: Web app | Execute as: Me | Who has access: Anyone
+ * 5. Click Deploy and copy the URL
+ * 6. Update SYNC_URL in js/storage.js
  *
- * IMPROVEMENTS OVER PREVIOUS VERSION:
- * - Per-task merge by updatedAt timestamp (no more full-state overwrite)
- * - Supports partial sync (only receives dirty/changed tasks from clients)
- * - Tombstone-aware: properly removes deleted tasks from server store
- * - Events sync support
- * - Multi-client safe with last-writer-wins per task
+ * WHAT'S NEW:
+ * - Per-task merge by updatedAt (no more full-state overwrite)
+ * - Tombstone-aware deletion
+ * - Events sync
+ * - Defensive error handling
  */
 
-const SPREADSHEET_ID = ''; // Optional: set to a Google Sheet ID for backup logging
-const SCRIPT_PROPS = PropertiesService.getScriptProperties();
-
-// --- GET handler (pull) ---
 function doGet(e) {
-  const action = (e && e.parameter && e.parameter.action) || 'getAll';
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var tasks = _safeLoadJSON(props, 'tasks') || [];
+    var users = _safeLoadJSON(props, 'users') || [];
+    var events = _safeLoadJSON(props, 'events') || [];
 
-  if (action === 'getAll') {
-    const tasks = _loadTasks();
-    const users = _loadUsers();
-    const events = _loadEvents();
-    return _jsonResponse({ status: 'ok', tasks, users, events });
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'ok',
+      tasks: tasks,
+      users: users,
+      events: events
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'GET error: ' + err.message
+    })).setMimeType(ContentService.MimeType.JSON);
   }
-
-  return _jsonResponse({ status: 'error', message: 'Unknown action' });
 }
 
-// --- POST handler (sync) ---
 function doPost(e) {
   try {
-    const payload = JSON.parse(e.postData.contents);
-    const action = payload.action;
+    // Parse the incoming payload
+    var raw = '';
+    if (e && e.postData && e.postData.contents) {
+      raw = e.postData.contents;
+    } else if (e && e.postData && e.postData.getDataAsString) {
+      raw = e.postData.getDataAsString();
+    } else {
+      return _errorResponse('No POST body received');
+    }
 
-    if (action === 'fullSync') {
+    var payload = JSON.parse(raw);
+    if (!payload || !payload.action) {
+      return _errorResponse('Missing action in payload');
+    }
+
+    if (payload.action === 'fullSync') {
       return _handleSync(payload);
     }
 
-    return _jsonResponse({ status: 'error', message: 'Unknown action: ' + action });
+    return _errorResponse('Unknown action: ' + payload.action);
+
   } catch (err) {
-    return _jsonResponse({ status: 'error', message: err.message });
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'POST error: ' + err.message + ' | Stack: ' + (err.stack || 'none')
+    })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-// --- Sync Handler ---
 function _handleSync(payload) {
-  const lock = LockService.getScriptLock();
+  var lock = LockService.getScriptLock();
+  var gotLock = false;
   try {
-    lock.waitLock(10000); // Wait up to 10s for other syncs to finish
-  } catch (e) {
-    return _jsonResponse({ status: 'error', message: 'Server busy, try again' });
+    gotLock = lock.tryLock(10000);
+  } catch (lockErr) {
+    // If lock fails, proceed without lock (rare edge case)
   }
 
   try {
-    const serverTasks = _loadTasks();
-    const serverUsers = _loadUsers();
-    const serverEvents = _loadEvents();
+    var props = PropertiesService.getScriptProperties();
+    var serverTasks = _safeLoadJSON(props, 'tasks') || [];
+    var serverUsers = _safeLoadJSON(props, 'users') || [];
+    var serverEvents = _safeLoadJSON(props, 'events') || [];
 
-    const clientTasks = payload.tasks || [];
-    const clientUsers = payload.users || [];
-    const clientTombstones = payload.tombstones || [];
-    const clientEvents = payload.events || [];
-    const isPartial = payload.partialSync === true;
+    var clientTasks = payload.tasks || [];
+    var clientUsers = payload.users || [];
+    var clientTombstones = payload.tombstones || [];
+    var clientEvents = payload.events || [];
+
+    // Build tombstone set
+    var tombstoneIds = {};
+    for (var t = 0; t < clientTombstones.length; t++) {
+      tombstoneIds[String(clientTombstones[t].id)] = true;
+    }
 
     // Build server task map
-    const serverMap = {};
-    serverTasks.forEach(t => serverMap[String(t.id)] = t);
+    var serverMap = {};
+    for (var i = 0; i < serverTasks.length; i++) {
+      var sid = String(serverTasks[i].id);
+      if (!tombstoneIds[sid]) {
+        serverMap[sid] = serverTasks[i];
+      }
+    }
 
-    // Apply tombstones first — remove deleted tasks from server
-    const tombstoneIds = new Set(clientTombstones.map(t => String(t.id)));
-    tombstoneIds.forEach(id => { delete serverMap[id]; });
+    // Merge client tasks (per-task, newest updatedAt wins)
+    for (var j = 0; j < clientTasks.length; j++) {
+      var ct = clientTasks[j];
+      var cid = String(ct.id);
+      if (tombstoneIds[cid]) continue;
 
-    // Merge client tasks into server (per-task by updatedAt)
-    clientTasks.forEach(ct => {
-      const cid = String(ct.id);
-      if (tombstoneIds.has(cid)) return; // skip tombstoned tasks
-
-      const serverTask = serverMap[cid];
-      if (!serverTask) {
-        // New task from client
+      var existing = serverMap[cid];
+      if (!existing) {
         serverMap[cid] = ct;
       } else {
-        // Both exist — keep the one with the newer updatedAt
-        const clientTime = new Date(ct.updatedAt || ct.createdAt || 0).getTime();
-        const serverTime = new Date(serverTask.updatedAt || serverTask.createdAt || 0).getTime();
-
+        var clientTime = new Date(ct.updatedAt || ct.createdAt || '2000-01-01').getTime();
+        var serverTime = new Date(existing.updatedAt || existing.createdAt || '2000-01-01').getTime();
         if (clientTime >= serverTime) {
-          // Client is newer or same — accept client version
           serverMap[cid] = ct;
         }
-        // else: server is newer — keep server version (already in map)
       }
-    });
+    }
 
-    // Convert map back to array
-    const mergedTasks = Object.values(serverMap);
-    _saveTasks(mergedTasks);
+    // Convert back to array
+    var mergedTasks = [];
+    for (var key in serverMap) {
+      if (serverMap.hasOwnProperty(key)) {
+        mergedTasks.push(serverMap[key]);
+      }
+    }
 
-    // Merge users (simple: update pins and roles)
-    const serverUserMap = {};
-    serverUsers.forEach(u => serverUserMap[u.name] = u);
-    clientUsers.forEach(cu => {
-      if (serverUserMap[cu.name]) {
-        if (cu.pin) serverUserMap[cu.name].pin = String(cu.pin);
-        if (cu.role) serverUserMap[cu.name].role = cu.role;
+    // Merge users
+    var userMap = {};
+    for (var u = 0; u < serverUsers.length; u++) {
+      userMap[serverUsers[u].name] = serverUsers[u];
+    }
+    for (var v = 0; v < clientUsers.length; v++) {
+      var cu = clientUsers[v];
+      if (userMap[cu.name]) {
+        if (cu.pin) userMap[cu.name].pin = String(cu.pin);
+        if (cu.role) userMap[cu.name].role = cu.role;
       } else {
-        serverUserMap[cu.name] = cu;
+        userMap[cu.name] = cu;
       }
-    });
-    const mergedUsers = Object.values(serverUserMap);
-    _saveUsers(mergedUsers);
-
-    // Merge events (by ID, newest wins)
-    const serverEventMap = {};
-    serverEvents.forEach(e => serverEventMap[e.id] = e);
-    clientEvents.forEach(ce => {
-      if (!serverEventMap[ce.id]) {
-        serverEventMap[ce.id] = ce;
+    }
+    var mergedUsers = [];
+    for (var ukey in userMap) {
+      if (userMap.hasOwnProperty(ukey)) {
+        mergedUsers.push(userMap[ukey]);
       }
-      // For events, client always wins since they're simpler
-      // (no complex conflict scenarios like tasks)
-      serverEventMap[ce.id] = ce;
-    });
-    const mergedEvents = Object.values(serverEventMap);
-    _saveEvents(mergedEvents);
+    }
 
-    return _jsonResponse({
+    // Merge events (client wins for simplicity)
+    var eventMap = {};
+    for (var se = 0; se < serverEvents.length; se++) {
+      eventMap[serverEvents[se].id] = serverEvents[se];
+    }
+    for (var ce = 0; ce < clientEvents.length; ce++) {
+      eventMap[clientEvents[ce].id] = clientEvents[ce];
+    }
+    var mergedEvents = [];
+    for (var ekey in eventMap) {
+      if (eventMap.hasOwnProperty(ekey)) {
+        mergedEvents.push(eventMap[ekey]);
+      }
+    }
+
+    // Save
+    props.setProperty('tasks', JSON.stringify(mergedTasks));
+    props.setProperty('users', JSON.stringify(mergedUsers));
+    props.setProperty('events', JSON.stringify(mergedEvents));
+
+    return ContentService.createTextOutput(JSON.stringify({
       status: 'ok',
       tasks: mergedTasks,
       users: mergedUsers,
-      events: mergedEvents
-    });
+      events: mergedEvents,
+      lastSync: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
 
   } finally {
-    lock.releaseLock();
+    if (gotLock) {
+      try { lock.releaseLock(); } catch (e) {}
+    }
   }
 }
 
-// --- Storage helpers (using Script Properties) ---
-// Script Properties has a 500KB limit per property; chunk if needed
-function _loadTasks() {
+function _safeLoadJSON(props, key) {
   try {
-    const raw = SCRIPT_PROPS.getProperty('tasks');
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    var raw = props.getProperty(key);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (err) {
+    return [];
+  }
 }
 
-function _saveTasks(tasks) {
-  SCRIPT_PROPS.setProperty('tasks', JSON.stringify(tasks));
-}
-
-function _loadUsers() {
-  try {
-    const raw = SCRIPT_PROPS.getProperty('users');
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function _saveUsers(users) {
-  SCRIPT_PROPS.setProperty('users', JSON.stringify(users));
-}
-
-function _loadEvents() {
-  try {
-    const raw = SCRIPT_PROPS.getProperty('events');
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function _saveEvents(events) {
-  SCRIPT_PROPS.setProperty('events', JSON.stringify(events));
-}
-
-function _jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+function _errorResponse(msg) {
+  return ContentService.createTextOutput(JSON.stringify({
+    status: 'error',
+    message: msg
+  })).setMimeType(ContentService.MimeType.JSON);
 }
