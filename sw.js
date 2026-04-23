@@ -1,12 +1,15 @@
 /**
- * Service Worker — Cultural Heritage Cluster Task Tracker
+ * Service Worker â Cultural Heritage Cluster Task Tracker
  * Enables offline-first operation with background sync
  */
 
-const CACHE_NAME = 'chc-task-tracker-v4';
+const CACHE_NAME = 'chc-task-tracker-v5';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   './js/config.js',
   './js/storage.js',
   './js/ui.js',
@@ -14,6 +17,7 @@ const ASSETS_TO_CACHE = [
   './js/events.js',
   './js/charts.js',
   './js/kanban.js',
+  './js/command-bar.js',
   './js/app.js',
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/chart.js',
