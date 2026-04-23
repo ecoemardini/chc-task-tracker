@@ -10,6 +10,8 @@ function init() {
     document.getElementById('logoHeader').src = logoB64;
     loadFromLocalStorage();
     loadEventsFromLocalStorage();
+    loadEventTombstones();
+    loadNotifications();
     populateUserSelect();
 
     const pinEl = document.getElementById('pinInput');
@@ -109,7 +111,65 @@ function showApp() {
     document.getElementById('loginContainer').classList.add('hidden');
     document.getElementById('header').classList.remove('hidden');
     document.getElementById('mainContent').classList.remove('hidden');
+    updateNotifBadge();
 }
+
+// --- Notifications UI ---
+function toggleNotifPanel() {
+    const panel = document.getElementById('notifPanel');
+    if (panel.style.display === 'none') {
+        renderNotifPanel();
+        panel.style.display = '';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function renderNotifPanel() {
+    const list = document.getElementById('notifList');
+    const notifs = getMyNotifications();
+    if (notifs.length === 0) {
+        list.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+    } else {
+        list.innerHTML = notifs.slice(0, 30).map(n => {
+            const ago = _timeAgo(new Date(n.timestamp));
+            return `<div class="notif-item ${n.read ? '' : 'unread'}" onclick="markNotificationRead('${n.id}');updateNotifBadge();this.classList.remove('unread');">
+                <div>${n.message}</div>
+                <div class="notif-time">${ago}</div>
+            </div>`;
+        }).join('');
+    }
+    updateNotifBadge();
+}
+
+function updateNotifBadge() {
+    const badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    const count = getUnreadCount();
+    if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function _timeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+}
+
+// Close notif panel when clicking outside
+document.addEventListener('click', function(e) {
+    const panel = document.getElementById('notifPanel');
+    const bell = document.getElementById('notifBell');
+    if (panel && bell && !panel.contains(e.target) && !bell.contains(e.target)) {
+        panel.style.display = 'none';
+    }
+});
 
 // --- Settings Tab ---
 function updateSettingsTab() {
@@ -360,14 +420,34 @@ function handleExcelImport() {
 }
 
 function clearAllData() {
-    if (confirm('Clear ALL data? This cannot be undone!')) {
-        if (confirm('Are you absolutely sure?')) {
+    if (tasks.length === 0) {
+        showToast('No data to clear', 'error');
+        return;
+    }
+
+    // First offer to save backup
+    const saveFirst = confirm('Would you like to save an Excel backup before deleting all data?\n\nClick OK to save backup first, or Cancel to skip.');
+    if (saveFirst) {
+        try { exportExcel(); } catch (e) { console.warn('Export failed:', e); }
+    }
+
+    // Then confirm deletion
+    if (confirm('Clear ALL ' + tasks.length + ' tasks and events? This cannot be undone!')) {
+        if (confirm('Are you absolutely sure? This will delete everything.')) {
+            // Tombstone all tasks
             tasks.forEach(t => { if (t && t.id !== undefined) addTombstone(t.id); });
+            // Tombstone all events
+            events.forEach(e => { if (e && e.id) addEventTombstone(e.id); });
             tasks = [];
+            events = [];
             saveToLocalStorage();
+            if (typeof saveEventsToLocalStorage === 'function') saveEventsToLocalStorage();
+            // Sync tombstones to server
+            if (SYNC_URL && isOnline) syncToServer();
             showToast('All data cleared', 'success');
             updateOverview();
             applyFilters();
+            if (typeof renderCalendar === 'function') renderCalendar();
         }
     }
 }

@@ -665,7 +665,20 @@ function addComment() {
         text,
         timestamp: new Date().toISOString()
     });
+    markTaskDirty(task.id);
     saveToLocalStorage();
+
+    // Notify the task owner if someone else commented
+    if (task.person && task.person !== currentUser.name) {
+        const shortText = text.length > 50 ? text.substring(0, 50) + '...' : text;
+        addNotification(
+            task.person,
+            `${currentUser.name.split(' ')[0]} commented on your task "${task.taskTitle}": "${shortText}"`,
+            task.id
+        );
+    }
+
+    logActivity('comment', `${currentUser.name.split(' ')[0]} commented on "${task.taskTitle}"`);
     showToast('Comment added', 'success');
     document.getElementById('commentInput').value = '';
     openCommentModal(commentingTaskId);

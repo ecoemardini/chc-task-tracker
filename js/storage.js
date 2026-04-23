@@ -64,6 +64,7 @@ function clearDirtyIds() {
 
 // --- Tombstones (deletion propagation) ---
 let tombstones = [];
+let eventTombstones = [];
 const TOMBSTONE_TTL_DAYS = 90;
 
 function loadTombstones() {
@@ -100,6 +101,86 @@ function pruneOldTombstones() {
         return dt > cutoff;
     });
     if (tombstones.length !== before) saveTombstones();
+    // Prune event tombstones too
+    const eBefore = eventTombstones.length;
+    eventTombstones = eventTombstones.filter(t => {
+        const dt = new Date(t.deletedAt || 0).getTime();
+        return dt > cutoff;
+    });
+    if (eventTombstones.length !== eBefore) saveEventTombstones();
+}
+
+// --- Event Tombstones ---
+function loadEventTombstones() {
+    try {
+        const stored = localStorage.getItem('chc_event_tombstones');
+        eventTombstones = stored ? JSON.parse(stored) : [];
+    } catch { eventTombstones = []; }
+}
+
+function saveEventTombstones() {
+    localStorage.setItem('chc_event_tombstones', JSON.stringify(eventTombstones));
+}
+
+function addEventTombstone(id) {
+    if (!id) return;
+    const sid = String(id);
+    eventTombstones = eventTombstones.filter(t => String(t.id) !== sid);
+    eventTombstones.push({ id: sid, deletedAt: new Date().toISOString() });
+    saveEventTombstones();
+}
+
+function isEventTombstoned(id) {
+    if (!id) return false;
+    return eventTombstones.some(t => String(t.id) === String(id));
+}
+
+// --- Notifications ---
+let _notifications = [];
+
+function loadNotifications() {
+    try {
+        const stored = localStorage.getItem('chc_notifications');
+        _notifications = stored ? JSON.parse(stored) : [];
+    } catch { _notifications = []; }
+}
+
+function saveNotifications() {
+    localStorage.setItem('chc_notifications', JSON.stringify(_notifications));
+}
+
+function addNotification(forPerson, message, taskId) {
+    _notifications.push({
+        id: 'n-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 4),
+        forPerson: forPerson,
+        message: message,
+        taskId: taskId || '',
+        timestamp: new Date().toISOString(),
+        read: false
+    });
+    saveNotifications();
+}
+
+function getMyNotifications() {
+    if (!currentUser) return [];
+    return _notifications.filter(n => n.forPerson === currentUser.name).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function markNotificationRead(id) {
+    const n = _notifications.find(n => n.id === id);
+    if (n) { n.read = true; saveNotifications(); }
+}
+
+function markAllNotificationsRead() {
+    _notifications.forEach(n => {
+        if (n.forPerson === currentUser.name) n.read = true;
+    });
+    saveNotifications();
+}
+
+function getUnreadCount() {
+    if (!currentUser) return 0;
+    return _notifications.filter(n => n.forPerson === currentUser.name && !n.read).length;
 }
 
 // --- Known Task IDs ---
@@ -311,11 +392,11 @@ async function syncToServer() {
                 if (usersChanged) _originalSave();
             }
 
-            // Merge events from server
+            // Merge events from server (respect event tombstones)
             if (result.events && typeof events !== 'undefined') {
                 const localEventIds = new Set(events.map(e => e.id));
                 result.events.forEach(se => {
-                    if (!localEventIds.has(se.id)) events.push(se);
+                    if (!localEventIds.has(se.id) && !isEventTombstoned(se.id)) events.push(se);
                 });
                 if (typeof saveEventsToLocalStorage === 'function') saveEventsToLocalStorage();
             }

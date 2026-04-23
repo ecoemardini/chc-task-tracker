@@ -24,7 +24,9 @@ function deleteEvent(id) {
     if (!canDelete) { showToast('You can only delete your own events', 'error'); return; }
 
     events = events.filter(e => e.id !== id);
+    addEventTombstone(id);
     saveEventsToLocalStorage();
+    logActivity('delete', `Event "${evt.title}" deleted`);
     showToast('Event deleted', 'success');
     renderCalendar();
 }
