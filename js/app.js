@@ -326,8 +326,9 @@ function handleExcelImport() {
 
                     if (weekVal && row.Project && titleVal) {
                         const now = new Date().toISOString();
+                        const taskId = newTaskId();
                         tasks.push({
-                            id: newTaskId(),
+                            id: taskId,
                             person: sheetPerson,
                             week: weekVal,
                             project: row.Project || '',
@@ -340,6 +341,7 @@ function handleExcelImport() {
                             createdAt: now,
                             updatedAt: now
                         });
+                        markTaskDirty(taskId);
                         importedCount++;
                     }
                 });
