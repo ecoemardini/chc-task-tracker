@@ -13,6 +13,7 @@ const ASSETS_TO_CACHE = [
   './js/tasks.js',
   './js/events.js',
   './js/charts.js',
+  './js/kanban.js',
   './js/app.js',
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/chart.js',
