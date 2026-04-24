@@ -474,13 +474,13 @@ function updateDashboard() {
     } else {
         myEventsEl.innerHTML = myEvents.map(e => {
             const color = projectColors[e.project] || getMemberColor(me, 0);
-            const loc = e.location ? ` — ${e.location}` : '';
+            const loc = e.location ? ` â ${e.location}` : '';
             const fmtDate = typeof formatDateShort === 'function' ? formatDateShort : d => d.toLocaleDateString();
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;">
                 <div style="width:4px;height:28px;border-radius:2px;background:${color};flex-shrink:0;"></div>
                 <div style="flex:1;">
                     <div style="font-size:13px;font-weight:600;">${e.title}${loc}</div>
-                    <div style="font-size:11px;color:var(--text-dim);">${fmtDate(new Date(e.startDate+'T00:00:00'))} — ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
+                    <div style="font-size:11px;color:var(--text-dim);">${fmtDate(new Date(e.startDate+'T00:00:00'))} â ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
                 </div>
             </div>`;
         }).join('');
@@ -503,32 +503,14 @@ function updateDashboard() {
         return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f4f8;">
             <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
             <span style="flex:1;font-size:13px;font-weight:600;">${u.name.split(' ')[0]}</span>
-            <span style="font-size:12px;color:var(--text-dim);">${totalW} task${totalW!==1?'s':''}</span>
-            ${ipCount > 0 ? `<span style="font-size:11px;background:rgba(0,174,239,0.15);color:var(--primary-blue);padding:1px 6px;border-radius:9999px;">${ipCount} active</span>` : ''}
-            ${doneCount > 0 ? `<span style="font-size:11px;background:rgba(0,196,160,0.15);color:var(--success);padding:1px 6px;border-radius:9999px;">${doneCount} done</span>` : ''}
-        </div>`;
-    }).join('');
-
-    // --- Team upcoming events ---
-    const allEvents = typeof events !== 'undefined' ? events : [];
-    const teamEvents = allEvents.filter(e => e.endDate >= todayStr)
-        .sort((a, b) => a.startDate.localeCompare(b.startDate))
-        .slice(0, 6);
-    const teamEventsEl = document.getElementById('dashTeamEventsList');
-    if (teamEvents.length === 0) {
-        teamEventsEl.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No upcoming events</p>';
-    } else {
-        const fmtDate = typeof formatDateShort === 'function' ? formatDateShort : d => d.toLocaleDateString();
-        teamEventsEl.innerHTML = teamEvents.map(e => {
-            const color = projectColors[e.project] || getMemberColor(e.person, 0);
-            const loc = e.location ? ` — ${e.location}` : '';
-            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;">
-                <div style="width:4px;height:28px;border-radius:2px;background:${color};flex-shrink:0;"></div>
+            <span style="font-size:12px;color:var(--text-dim);">${totalW} task${totalW!==1?s:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f4f8;font-size:12px;">
+                ${avatar}
                 <div style="flex:1;">
-                    <div style="font-size:13px;font-weight:600;">${e.title}${loc}</div>
-                    <div style="font-size:11px;color:var(--text-dim);">${e.person.split(' ')[0]} · ${fmtDate(new Date(e.startDate+'T00:00:00'))} — ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
+                    <span style="color:${color};font-weight:700;">${entry.action.toUpperCase()}</span>
+                    <span style="color:var(--text-dim);">${entry.details}</span>
                 </div>
+                <span style="font-size:11px;color:var(--text-dim);white-space:nowrap;">${ago}</span>
             </div>`;
-        }).join('');
-    }
+        }).join('')}
+    </div>`;
 }
