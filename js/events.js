@@ -1,6 +1,6 @@
 // ============ TEAM EVENTS CALENDAR ============
 // Swimlane timeline calendar for team events (meetings, fieldwork, travel, etc.)
-// Separate from tasks — purely visual scheduling.
+// Separate from tasks â purely visual scheduling.
 
 let events = [];
 
@@ -44,6 +44,89 @@ function loadEventsFromLocalStorage() {
         const stored = localStorage.getItem('chc_events');
         events = stored ? JSON.parse(stored) : [];
     } catch { events = []; }
+}
+// --- iCalendar (.ics) Generation ---
+function generateICS(event) {
+    if (!event) return '';
+
+    // Get the user who created this event (or find their email)
+    const person = users.find(u => u.name === event.person);
+    const personEmail = person ? person.email : 'user@example.com';
+
+    // Format dates for iCalendar (YYYYMMDD for all-day events)
+    const startDate = event.startDate.replace(/-/g, '');
+    const endDate = event.endDate.replace(/-/g, '');
+
+    // Add 1 day to endDate for all-day events (iCalendar spec)
+    const endDateObj = new Date(event.endDate);
+    endDateObj.setDate(endDateObj.getDate() + 1);
+    const endDateFormatted = endDateObj.getFullYear() +
+                             String(endDateObj.getMonth() + 1).padStart(2, '0') +
+                             String(endDateObj.getDate()).padStart(2, '0');
+
+    // Escape special characters in text fields
+    const escapeICS = (str) => {
+        if (!str) return '';
+        return str.replace(/[\n\r]/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+    };
+
+    const title = escapeICS(event.title);
+    const location = event.location ? escapeICS(event.location) : '';
+    const description = event.project ? `Project: ${escapeICS(event.project)}` : '';
+    const createdBy = escapeICS(event.createdBy || 'CHC Tracker');
+
+    // Generate unique UID
+    const uid = `${event.id}@chc-task-tracker.example.com`;
+
+    // Generate current timestamp in iCalendar format
+    const now = new Date();
+    const dtstamp = now.getUTCFullYear() +
+                    String(now.getUTCMonth() + 1).padStart(2, '0') +
+                    String(now.getUTCDate()).padStart(2, '0') +
+                    'T' +
+                    String(now.getUTCHours()).padStart(2, '0') +
+                    String(now.getUTCMinutes()).padStart(2, '0') +
+                    String(now.getUTCSeconds()).padStart(2, '0') + 'Z';
+
+    const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//CHC Task Tracker//CHC//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${dtstamp}
+DTSTART;VALUE=DATE:${startDate}
+DTEND;VALUE=DATE:${endDateFormatted}
+SUMMARY:${title}
+LOCATION:${location}
+DESCRIPTION:${description}
+ORGANIZER;CN=${createdBy}:mailto:${personEmail}
+ATTENDEE:mailto:${personEmail}
+CREATED:${dtstamp}
+LAST-MODIFIED:${dtstamp}
+SEQUENCE:0
+STATUS:CONFIRMED
+TRANSP:TRANSPARENT
+END:VEVENT
+END:VCALENDAR`;
+
+    return icsContent;
+}
+
+// Download .ics file
+function downloadICS(event) {
+    if (!event) return;
+
+    const icsContent = generateICS(event);
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${event.title.replace(/\s+/g, '_')}_${event.startDate}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 }
 
 // --- Calendar State ---
@@ -93,7 +176,7 @@ function renderCalendar() {
 
     // Range label
     document.getElementById('calendarRangeLabel').textContent =
-        formatDateShort(dates[0]) + ' — ' + formatDateShort(dates[N - 1]);
+        formatDateShort(dates[0]) + ' â ' + formatDateShort(dates[N - 1]);
 
     // --- Month header row ---
     let monthCells = '';
@@ -186,6 +269,7 @@ function renderCalendar() {
                 ' title="' + evt.title + loc + '"' +
                 ' onclick="showEventDetail(\'' + evt.id + '\')">' +
                 logo + '<span class="cal-evt-txt">' + evt.title + loc + '</span>' +
+                '<button class="cal-evt-download-btn" onclick="event.stopPropagation(); downloadICS({id:\'' + evt.id + '\',title:\'' + evt.title.replace(/'/g, "\\'") + '\',startDate:\'' + evt.startDate + '\',endDate:\'' + evt.endDate + '\',location:\'' + (evt.location || '').replace(/'/g, "\\'") + '\',project:\'' + evt.project + '\',person:\'' + evt.person + '\',createdBy:\'' + evt.createdBy + '\'});" title="Download calendar file" style="display:none;padding:0;width:16px;height:16px;min-width:16px;">ð</button>' +
             '</div>';
         });
 
@@ -322,11 +406,12 @@ function showEventDetail(id) {
     document.getElementById('eventDetailBody').innerHTML = `
         <h3 style="margin-bottom:12px;color:var(--dark-navy);">${evt.title}</h3>
         <p><strong>Who:</strong> ${evt.person}</p>
-        <p><strong>When:</strong> ${formatDateShort(new Date(evt.startDate + 'T00:00:00'))} — ${formatDateShort(new Date(evt.endDate + 'T00:00:00'))}</p>
+        <p><strong>When:</strong> ${formatDateShort(new Date(evt.startDate + 'T00:00:00'))} â ${formatDateShort(new Date(evt.endDate + 'T00:00:00'))}</p>
         ${locationLine}
         ${projectLine}
         <p style="font-size:11px;color:var(--text-dim);margin-top:12px;">Added by ${evt.createdBy || 'unknown'}</p>
         <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-secondary btn-sm" onclick="downloadICS({id:'${evt.id}',title:'${evt.title.replace(/'/g, "\\'")}',startDate:'${evt.startDate}',endDate:'${evt.endDate}',location:'${(evt.location || '').replace(/'/g, "\\'")}',project:'${evt.project || ''}',person:'${evt.person}',createdBy:'${evt.createdBy}'});" title="Download calendar file">ð Download .ics</button>
             ${canDel ? `<button class="btn btn-primary btn-sm" onclick="openEditEventModal('${evt.id}'); closeEventDetailModal();">Edit</button>` : ''}
             ${canDel ? `<button class="btn btn-danger btn-sm" onclick="deleteEvent('${evt.id}'); closeEventDetailModal();">Delete</button>` : ''}
         </div>
@@ -348,7 +433,7 @@ function _populateEventModal() {
         .join('');
 
     const projectSelect = document.getElementById('eventProject');
-    projectSelect.innerHTML = '<option value="">— None —</option>' +
+    projectSelect.innerHTML = '<option value="">â None â</option>' +
         projects.map(p => `<option value="${p}">${p}</option>`).join('');
 }
 
