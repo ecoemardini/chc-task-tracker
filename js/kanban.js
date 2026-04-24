@@ -82,7 +82,7 @@ function renderKanban() {
                         <strong class="kanban-card-title">${escapeHtml(task.taskTitle)}</strong>
                     </div>
                     <div class="kanban-card-meta">
-                        <span class="kanban-project-tag" style="background-color: ${projectColor};">${escapeHtml(task.project)}</span>
+                        <span class="kanban-project-tag" style="background-color: ${projectColor};">${projectLogos[task.project] ? `<img src="${projectLogos[task.project]}" alt="${escapeHtml(task.project)}" title="${escapeHtml(task.project)}" style="height:16px;width:auto;vertical-align:middle;border-radius:2px;">` : escapeHtml(task.project)}</span>
                         <span class="kanban-person-badge">${escapeHtml(personFirstName)}</span>
                     </div>
                     <div class="kanban-card-footer">
