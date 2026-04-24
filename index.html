@@ -2353,6 +2353,7 @@
         <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
         <button class="tab-btn" onclick="switchTab('log-task')">+ Log Task <span class="tab-badge" id="badge-log-task">0</span></button>
         <button class="tab-btn" onclick="switchTab('all-tasks')">All Tasks <span class="tab-badge" id="badge-all-tasks">0</span></button>
+        <button class="tab-btn" onclick="switchTab('kanban')">Kanban</button>
         <button class="tab-btn" onclick="switchTab('overview')">Overview <span class="tab-badge" id="badge-overview">0</span></button>
         <button class="tab-btn" onclick="switchTab('team')">Team</button>
         <button class="tab-btn" onclick="switchTab('projects')">Projects</button>
@@ -2603,6 +2604,26 @@
                 <tbody id="allTasksBody">
                 </tbody>
             </table>
+        </div>
+
+        <!-- Kanban Tab -->
+        <div id="kanban" class="tab-content">
+            <h2 class="section-title">Kanban Board</h2>
+            <div class="filter-bar" style="margin-bottom:16px;">
+                <div class="filter-group">
+                    <label for="kanbanFilterPerson">Person</label>
+                    <select id="kanbanFilterPerson" onchange="updateKanban()">
+                        <option value="">All People</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="kanbanFilterProject">Project</label>
+                    <select id="kanbanFilterProject" onchange="updateKanban()">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+            </div>
+            <div id="kanbanBoard"></div>
         </div>
 
         <!-- Calendar Tab -->
