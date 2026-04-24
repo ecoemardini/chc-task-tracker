@@ -227,12 +227,26 @@ function deleteUser(name) {
 
 function updateProjectsSettings() {
     const container = document.getElementById('projectsSettings');
-    container.innerHTML = projects.map(p => `
-        <div class="list-item">
-            <div class="list-item-content"><span class="project-tag" style="background-color: ${projectColors[p] || '#999'};">${projectLogos[p] ? `<img class="project-tag-logo" src="${projectLogos[p]}" alt="">` : ''}${p}</span></div>
-            <div class="list-item-actions"><button class="btn btn-sm btn-danger" onclick="deleteProject('${p}')">Remove</button></div>
-        </div>
-    `).join('');
+    container.innerHTML = projects.map(p => {
+        const logoPreview = projectLogos[p]
+            ? `<img src="${projectLogos[p]}" alt="${p}" style="height:24px;width:auto;border-radius:4px;margin-right:8px;vertical-align:middle;">`
+            : '';
+        const logoActions = projectLogos[p]
+            ? `<button class="btn btn-sm btn-secondary" onclick="uploadProjectLogo('${p.replace(/'/g,"\\'")}')" title="Change logo" style="font-size:11px;">Change Logo</button>
+               <button class="btn btn-sm btn-secondary" onclick="removeProjectLogo('${p.replace(/'/g,"\\'")}')" title="Remove logo" style="font-size:11px;">Remove Logo</button>`
+            : `<button class="btn btn-sm btn-secondary" onclick="uploadProjectLogo('${p.replace(/'/g,"\\'")}')" title="Upload logo" style="font-size:11px;">Upload Logo</button>`;
+        return `
+        <div class="list-item" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee;">
+            <div class="list-item-content" style="flex:1;display:flex;align-items:center;">
+                ${logoPreview}
+                <span class="project-tag" style="background-color: ${projectColors[p] || '#999'};">${projectDisplayHTML(p, 18)}</span>
+            </div>
+            <div class="list-item-actions" style="display:flex;gap:6px;">
+                ${logoActions}
+                <button class="btn btn-sm btn-danger" onclick="deleteProject('${p.replace(/'/g,"\\'")}')">Remove</button>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function addProject() {
