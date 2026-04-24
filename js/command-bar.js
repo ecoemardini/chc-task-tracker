@@ -85,7 +85,7 @@ function buildCommandIndex() {
         icon: '✓',
         title: t.taskTitle || '(untitled)',
         subtitle: `${t.person} — ${t.project || 'No project'}`,
-        action: () => openEditModal(t.id),
+        action: () => openEditTaskModal(t.id),
         searchText: `${t.taskTitle} ${t.taskDescription} ${t.person}`.toLowerCase()
     }));
 
