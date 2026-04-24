@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cultural Heritage Cluster — Task Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#003b5b">
+    <meta name="description" content="Team task and event management for Cultural Heritage Cluster research projects">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <!-- Libraries loaded at bottom of body for performance -->
     <style>
         * {
@@ -1443,222 +1451,396 @@
             gap: 8px;
         }
 
-        /* ---- Kanban Board ---- */
-        .kanban-board {
-            display: flex;
-            gap: 16px;
-            height: calc(100vh - 300px);
-            overflow: auto;
+        /* ========== IMPROVEMENT A: Skeleton Loading ========== */
+        .skeleton {
+            background: linear-gradient(90deg, #e0e7f1 25%, #f0f4f8 50%, #e0e7f1 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+            border-radius: 6px;
+            height: 20px;
         }
 
-        .kanban-column {
-            flex: 1;
-            background: var(--light-bg);
+        [data-theme="dark"] .skeleton {
+            background: linear-gradient(90deg, #253347 25%, #2d3e52 50%, #253347 75%);
+            background-size: 200% 100%;
+        }
+
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* ========== IMPROVEMENT B: Avatar Styling ========== */
+        .member-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: inline-block;
+        }
+
+        .member-avatar-small {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: inline-block;
+        }
+
+        .avatar-fallback {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            color: white;
+            background: var(--primary-blue);
+        }
+
+        .avatar-with-name {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ========== IMPROVEMENT C: Empty State ========== */
+        .empty-state-container {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            opacity: 0.6;
+        }
+
+        .empty-state-container h3 {
+            font-size: 20px;
+            color: var(--text-dark);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .empty-state-container p {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-bottom: 24px;
+        }
+
+        .empty-state-cta {
+            display: inline-block;
+        }
+
+        /* ========== IMPROVEMENT D: Streak Counter ========== */
+        .streak-card {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%);
+            color: white;
             border-radius: var(--radius-card);
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 16px;
+        }
+
+        .streak-flame {
+            font-size: 28px;
+            animation: flameFlicker 2s ease-in-out infinite;
+        }
+
+        @keyframes flameFlicker {
+            0%, 100% { transform: scale(1) translateY(0); }
+            50% { transform: scale(1.1) translateY(-2px); }
+        }
+
+        .streak-text {
+            flex: 1;
+        }
+
+        .streak-text .label {
+            font-size: 11px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .streak-text .value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        /* ========== IMPROVEMENT E: Progress Rings ========== */
+        .progress-ring-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .progress-ring-card {
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 16px;
+            box-shadow: var(--shadow);
             display: flex;
             flex-direction: column;
-            min-width: 320px;
+            align-items: center;
             border: 1px solid var(--border-color);
             transition: var(--transition);
         }
 
-        [data-theme="dark"] .kanban-column {
-            background: var(--dark-surface-secondary);
-            border-color: var(--dark-border);
-        }
-
-        .kanban-column-header {
-            padding: 16px;
-            border-bottom: 2px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--surface-white);
-            border-radius: var(--radius-card) var(--radius-card) 0 0;
-        }
-
-        [data-theme="dark"] .kanban-column-header {
-            background: var(--dark-surface);
-            border-bottom-color: var(--dark-border);
-        }
-
-        .kanban-column-header h3 {
-            margin: 0;
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--dark-navy);
-        }
-
-        [data-theme="dark"] .kanban-column-header h3 {
-            color: var(--dark-text);
-        }
-
-        .kanban-count-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--primary-blue);
-            color: white;
-            border-radius: var(--radius-pill);
-            font-size: 12px;
-            font-weight: 600;
-            min-width: 24px;
-            height: 24px;
-        }
-
-        .kanban-drop-zone {
-            flex: 1;
-            padding: 12px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .kanban-drop-highlight {
-            background: rgba(0, 174, 239, 0.1) !important;
-            border: 2px dashed var(--primary-blue);
-            border-radius: var(--radius-card);
-        }
-
-        .kanban-card {
-            background: var(--surface-white);
-            border: 0.5px solid #e0e7f1;
-            border-radius: 8px;
-            padding: 10px 12px;
-            cursor: grab;
-            transition: var(--transition);
-            box-shadow: var(--shadow);
-            user-select: none;
-        }
-
-        [data-theme="dark"] .kanban-card {
+        [data-theme="dark"] .progress-ring-card {
             background: var(--dark-surface);
             border-color: var(--dark-border);
         }
 
-        .kanban-card:hover {
-            box-shadow: 0 2px 8px rgba(0, 149, 208, 0.2);
+        .progress-ring-card:hover {
             transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
 
-        .kanban-card:active {
-            cursor: grabbing;
+        .progress-ring {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 12px;
         }
 
-        .kanban-card-dragging {
-            opacity: 0.5;
-            cursor: grabbing;
-        }
-
-        .kanban-card-header {
-            margin-bottom: 8px;
-        }
-
-        .kanban-card-title {
+        .progress-ring-label {
             font-size: 13px;
             font-weight: 600;
             color: var(--text-dark);
-            display: block;
-            word-break: break-word;
-            line-height: 1.3;
+            margin-bottom: 8px;
+            text-align: center;
         }
 
-        [data-theme="dark"] .kanban-card-title {
-            color: var(--dark-text);
+        .progress-ring-stat {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: center;
         }
 
-        .kanban-card-meta {
+        /* ========== IMPROVEMENT G: Inline Editing ========== */
+        .status-badge-clickable,
+        .priority-badge-clickable {
+            cursor: pointer;
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .status-badge-clickable:hover,
+        .priority-badge-clickable:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ========== IMPROVEMENT H: Keyboard Shortcuts ========== */
+        .shortcuts-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--surface-white);
+            border-radius: var(--radius-card);
+            padding: 24px;
+            box-shadow: var(--shadow-dark);
+            z-index: 10001;
+            max-width: 400px;
+            width: 90%;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        [data-theme="dark"] .shortcuts-panel {
+            background: var(--dark-surface);
+        }
+
+        .shortcuts-panel h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-dark);
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .shortcut-key {
+            background: var(--surface-secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-family: monospace;
+            color: var(--primary-blue);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        [data-theme="dark"] .shortcut-key {
+            background: var(--dark-surface-secondary);
+        }
+
+        /* ========== IMPROVEMENT I: Bulk Actions Toolbar ========== */
+        .bulk-toolbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-blue);
+            color: white;
+            border-radius: var(--radius-card);
+            padding: 12px 18px;
+            box-shadow: var(--shadow-dark);
             display: flex;
             align-items: center;
-            gap: 6px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
+            gap: 16px;
+            z-index: 999;
+            animation: slideUp 0.3s ease-out;
         }
 
-        .kanban-project-tag {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: var(--radius-pill);
-            font-size: 10px;
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        .bulk-toolbar .selected-count {
             font-weight: 600;
-            color: white;
-            white-space: nowrap;
+            min-width: 100px;
         }
 
-        .kanban-person-badge {
-            display: inline-flex;
+        .bulk-toolbar .btn {
+            margin: 0;
+            padding: 6px 12px;
+            font-size: 11px;
+        }
+
+        /* ========== IMPROVEMENT J: Task Pinning ========== */
+        .pinned-indicator {
+            color: var(--warning);
+            font-weight: 700;
+            margin-right: 4px;
+        }
+
+        .task-row-pinned {
+            border-left: 3px solid var(--warning) !important;
+        }
+
+        .pin-button {
+            cursor: pointer;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        .pin-button:hover {
+            transform: scale(1.2);
+        }
+
+        .pin-button.pinned {
+            color: var(--warning);
+        }
+
+        /* ========== IMPROVEMENT K: Smart Grouping ========== */
+        .group-header {
+            background: var(--surface-secondary);
+            padding: 10px 12px;
+            font-weight: 600;
+            color: var(--text-dark);
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        [data-theme="dark"] .group-header {
+            background: var(--dark-surface-secondary);
+        }
+
+        .group-header:hover {
+            background: rgba(0, 149, 208, 0.1);
+        }
+
+        .group-toggle-icon {
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        .group-toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .group-content {
+            transition: max-height 0.3s ease-out;
+            overflow: hidden;
+        }
+
+        .group-content.collapsed {
+            max-height: 0;
+        }
+
+        /* ========== IMPROVEMENT L: Customizable Dashboard Widgets ========== */
+        .dash-widget {
+            position: relative;
+        }
+
+        .widget-drag-handle {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            cursor: grab;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .dash-widget:hover .widget-drag-handle {
+            opacity: 1;
+        }
+
+        .widget-drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .widget-hide-toggle {
+            position: absolute;
+            top: 8px;
+            right: 30px;
+            background: var(--surface-secondary);
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+            display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--surface-secondary);
-            color: var(--text-dark);
-            border-radius: var(--radius-pill);
-            font-size: 10px;
-            font-weight: 600;
-            padding: 3px 8px;
-            white-space: nowrap;
+            font-size: 12px;
         }
 
-        [data-theme="dark"] .kanban-person-badge {
-            background: var(--dark-surface-secondary);
-            color: var(--dark-text);
+        .dash-widget:hover .widget-hide-toggle {
+            opacity: 1;
         }
 
-        .kanban-card-footer {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .kanban-priority-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: var(--radius-pill);
-            font-size: 10px;
-            font-weight: 600;
-        }
-
-        /* Responsive: Stack columns on tablet and mobile */
-        @media (max-width: 1024px) {
-            .kanban-board {
-                flex-direction: column;
-                height: auto;
-                min-height: calc(100vh - 300px);
-            }
-
-            .kanban-column {
-                min-width: 100%;
-                max-height: 400px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .kanban-board {
-                flex-direction: column;
-                gap: 12px;
-            }
-
-            .kanban-column {
-                min-width: 100%;
-                max-height: 350px;
-            }
-
-            .kanban-column-header {
-                padding: 12px;
-            }
-
-            .kanban-drop-zone {
-                padding: 8px;
-                gap: 8px;
-            }
-
-            .kanban-card {
-                padding: 8px 10px;
-            }
-
-            .kanban-card-title {
-                font-size: 12px;
-            }
+        .dash-widget.dragging {
+            opacity: 0.5;
         }
 
         /* Tablet (768px - 1024px) */
@@ -1929,6 +2111,173 @@
                 padding: 10px;
             }
         }
+
+        /* ============ COMMAND PALETTE STYLES ============ */
+        .cmd-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 10000;
+            backdrop-filter: blur(2px);
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        .cmd-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 520px;
+            max-width: 90vw;
+            background: var(--surface-white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-dark);
+            z-index: 10001;
+            display: flex;
+            flex-direction: column;
+            max-height: 80vh;
+            animation: cmdSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        [data-theme="dark"] .cmd-modal {
+            background: var(--dark-surface);
+        }
+
+        @keyframes cmdSlideIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -48%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        .cmd-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        [data-theme="dark"] .cmd-header {
+            border-bottom-color: var(--dark-border);
+        }
+
+        .cmd-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-dark);
+            font-size: 16px;
+            font-family: 'Nunito', sans-serif;
+            outline: none;
+        }
+
+        [data-theme="dark"] .cmd-input {
+            color: var(--dark-text);
+        }
+
+        .cmd-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .cmd-results {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            max-height: 360px;
+        }
+
+        .cmd-category {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 12px 4px 12px;
+            margin-top: 6px;
+        }
+
+        .cmd-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-bottom: 2px;
+        }
+
+        .cmd-item:hover {
+            background: var(--surface-secondary);
+        }
+
+        [data-theme="dark"] .cmd-item:hover {
+            background: var(--dark-surface-secondary);
+        }
+
+        .cmd-item.active {
+            background: rgba(0, 149, 208, 0.12);
+            color: var(--primary-blue);
+        }
+
+        [data-theme="dark"] .cmd-item.active {
+            background: rgba(0, 149, 208, 0.2);
+        }
+
+        .cmd-item-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+            width: 24px;
+            text-align: center;
+        }
+
+        .cmd-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cmd-item-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        [data-theme="dark"] .cmd-item-title {
+            color: var(--dark-text);
+        }
+
+        .cmd-item-subtitle {
+            font-size: 12px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+
+        .cmd-item-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            flex-shrink: 0;
+            background: var(--surface-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        [data-theme="dark"] .cmd-item-hint {
+            background: var(--dark-surface-secondary);
+        }
     </style>
 </head>
 <body>
@@ -1983,12 +2332,27 @@
     </div>
 </header>
 
+<!-- Command Palette Modal -->
+<div id="cmdOverlay" class="cmd-overlay" style="display:none;"></div>
+<div id="cmdModal" class="cmd-modal" style="display:none;">
+    <div class="cmd-header">
+        <input
+            id="cmdInput"
+            type="text"
+            class="cmd-input"
+            placeholder="Type to search... (⌘K to open, ESC to close)"
+            autocomplete="off"
+            spellcheck="false"
+        >
+    </div>
+    <div id="cmdResults" class="cmd-results"></div>
+</div>
+
 <div id="mainContainer" class="container hidden">
     <div class="sidebar">
         <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
         <button class="tab-btn" onclick="switchTab('log-task')">+ Log Task <span class="tab-badge" id="badge-log-task">0</span></button>
         <button class="tab-btn" onclick="switchTab('all-tasks')">All Tasks <span class="tab-badge" id="badge-all-tasks">0</span></button>
-        <button class="tab-btn" onclick="switchTab('kanban')">Kanban</button>
         <button class="tab-btn" onclick="switchTab('overview')">Overview <span class="tab-badge" id="badge-overview">0</span></button>
         <button class="tab-btn" onclick="switchTab('team')">Team</button>
         <button class="tab-btn" onclick="switchTab('projects')">Projects</button>
@@ -2239,26 +2603,6 @@
                 <tbody id="allTasksBody">
                 </tbody>
             </table>
-        </div>
-
-        <!-- Kanban Tab -->
-        <div id="kanban" class="tab-content">
-            <h2 class="section-title">Kanban Board</h2>
-            <div class="filter-bar">
-                <div class="filter-group">
-                    <label for="kanbanFilterPerson">Person</label>
-                    <select id="kanbanFilterPerson" onchange="filterKanban()">
-                        <option value="">All People</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="kanbanFilterProject">Project</label>
-                    <select id="kanbanFilterProject" onchange="filterKanban()">
-                        <option value="">All Projects</option>
-                    </select>
-                </div>
-            </div>
-            <div id="kanbanBoard"></div>
         </div>
 
         <!-- Calendar Tab -->
@@ -2581,6 +2925,7 @@
 <script src="js/events.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/kanban.js"></script>
+<script src="js/command-bar.js"></script>
 <script src="js/app.js"></script>
 
 <script>
