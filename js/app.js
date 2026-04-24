@@ -459,7 +459,7 @@ function clearAllData() {
 window.addEventListener('online', () => {
     isOnline = true;
     updateSyncIndicator();
-    showToast('Back online â syncing...', 'success');
+    showToast('Back online — syncing...', 'success');
     if (SYNC_URL) pullFromServer().then(() => syncToServer());
 });
 
