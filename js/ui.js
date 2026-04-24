@@ -58,6 +58,8 @@ function switchTab(tabName) {
         updateTimelineTab();
     } else if (tabName === 'all-tasks') {
         updateAllTasksTab();
+    } else if (tabName === 'kanban') {
+        updateKanban();
     } else if (tabName === 'calendar') {
         updateCalendarTab();
     } else if (tabName === 'settings') {
