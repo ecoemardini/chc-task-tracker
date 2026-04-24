@@ -1,6 +1,6 @@
 // ============ TEAM EVENTS CALENDAR ============
 // Swimlane timeline calendar for team events (meetings, fieldwork, travel, etc.)
-// Separate from tasks â purely visual scheduling.
+// Separate from tasks — purely visual scheduling.
 
 let events = [];
 
@@ -45,6 +45,7 @@ function loadEventsFromLocalStorage() {
         events = stored ? JSON.parse(stored) : [];
     } catch { events = []; }
 }
+
 // --- iCalendar (.ics) Generation ---
 function generateICS(event) {
     if (!event) return '';
@@ -176,7 +177,7 @@ function renderCalendar() {
 
     // Range label
     document.getElementById('calendarRangeLabel').textContent =
-        formatDateShort(dates[0]) + ' â ' + formatDateShort(dates[N - 1]);
+        formatDateShort(dates[0]) + ' — ' + formatDateShort(dates[N - 1]);
 
     // --- Month header row ---
     let monthCells = '';
@@ -269,7 +270,7 @@ function renderCalendar() {
                 ' title="' + evt.title + loc + '"' +
                 ' onclick="showEventDetail(\'' + evt.id + '\')">' +
                 logo + '<span class="cal-evt-txt">' + evt.title + loc + '</span>' +
-                '<button class="cal-evt-download-btn" onclick="event.stopPropagation(); downloadICS({id:\'' + evt.id + '\',title:\'' + evt.title.replace(/'/g, "\\'") + '\',startDate:\'' + evt.startDate + '\',endDate:\'' + evt.endDate + '\',location:\'' + (evt.location || '').replace(/'/g, "\\'") + '\',project:\'' + evt.project + '\',person:\'' + evt.person + '\',createdBy:\'' + evt.createdBy + '\'});" title="Download calendar file" style="display:none;padding:0;width:16px;height:16px;min-width:16px;">ð</button>' +
+                '<button class="cal-evt-download-btn" onclick="event.stopPropagation(); downloadICS({id:\'' + evt.id + '\',title:\'' + evt.title.replace(/'/g, "\\'") + '\',startDate:\'' + evt.startDate + '\',endDate:\'' + evt.endDate + '\',location:\'' + (evt.location || '').replace(/'/g, "\\'") + '\',project:\'' + evt.project + '\',person:\'' + evt.person + '\',createdBy:\'' + evt.createdBy + '\'});" title="Download calendar file" style="display:none;padding:0;width:16px;height:16px;min-width:16px;">📅</button>' +
             '</div>';
         });
 
@@ -406,12 +407,12 @@ function showEventDetail(id) {
     document.getElementById('eventDetailBody').innerHTML = `
         <h3 style="margin-bottom:12px;color:var(--dark-navy);">${evt.title}</h3>
         <p><strong>Who:</strong> ${evt.person}</p>
-        <p><strong>When:</strong> ${formatDateShort(new Date(evt.startDate + 'T00:00:00'))} â ${formatDateShort(new Date(evt.endDate + 'T00:00:00'))}</p>
+        <p><strong>When:</strong> ${formatDateShort(new Date(evt.startDate + 'T00:00:00'))} — ${formatDateShort(new Date(evt.endDate + 'T00:00:00'))}</p>
         ${locationLine}
         ${projectLine}
         <p style="font-size:11px;color:var(--text-dim);margin-top:12px;">Added by ${evt.createdBy || 'unknown'}</p>
         <div style="display:flex;gap:8px;margin-top:12px;">
-            <button class="btn btn-secondary btn-sm" onclick="downloadICS({id:'${evt.id}',title:'${evt.title.replace(/'/g, "\\'")}',startDate:'${evt.startDate}',endDate:'${evt.endDate}',location:'${(evt.location || '').replace(/'/g, "\\'")}',project:'${evt.project || ''}',person:'${evt.person}',createdBy:'${evt.createdBy}'});" title="Download calendar file">ð Download .ics</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadICS({id:'${evt.id}',title:'${evt.title.replace(/'/g, "\\'")}',startDate:'${evt.startDate}',endDate:'${evt.endDate}',location:'${(evt.location || '').replace(/'/g, "\\'")}',project:'${evt.project || ''}',person:'${evt.person}',createdBy:'${evt.createdBy}'});" title="Download calendar file">📅 Download .ics</button>
             ${canDel ? `<button class="btn btn-primary btn-sm" onclick="openEditEventModal('${evt.id}'); closeEventDetailModal();">Edit</button>` : ''}
             ${canDel ? `<button class="btn btn-danger btn-sm" onclick="deleteEvent('${evt.id}'); closeEventDetailModal();">Delete</button>` : ''}
         </div>
@@ -433,7 +434,7 @@ function _populateEventModal() {
         .join('');
 
     const projectSelect = document.getElementById('eventProject');
-    projectSelect.innerHTML = '<option value="">â None â</option>' +
+    projectSelect.innerHTML = '<option value="">— None —</option>' +
         projects.map(p => `<option value="${p}">${p}</option>`).join('');
 }
 
