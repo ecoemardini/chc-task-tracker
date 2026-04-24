@@ -402,7 +402,7 @@ function showEventDetail(id) {
     if (!evt) return;
     const canDel = currentUser.role === 'admin' || evt.createdBy === currentUser.name;
     const locationLine = evt.location ? `<p><strong>Location:</strong> ${evt.location}</p>` : '';
-    const projectLine = evt.project ? `<p><strong>Project:</strong> ${projectLogoHTML(evt.project, 16)} ${evt.project}</p>` : '';
+    const projectLine = evt.project ? `<p><strong>Project:</strong> ${projectDisplayHTML(evt.project, 16)}</p>` : '';
 
     document.getElementById('eventDetailBody').innerHTML = `
         <h3 style="margin-bottom:12px;color:var(--dark-navy);">${evt.title}</h3>
