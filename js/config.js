@@ -109,3 +109,17 @@ function getCurrentWeek() {
     const crossing = monday.getMonth() !== friday.getMonth();
     return formatWeekRange(monday, friday, crossing);
 }
+
+// ============ IMPROVEMENT B: MEMBER AVATAR HELPER ============
+function memberAvatarHTML(name, size = 'default') {
+    const sizeClass = size === 'small' ? 'member-avatar-small' : 'member-avatar';
+    const photoData = memberPhotos[name];
+    if (photoData) {
+        return `<img src="${photoData}" alt="${name}" class="${sizeClass}" title="${name}">`;
+    }
+    // Fallback to initials circle
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
+    const color = getMemberColor(name, 0);
+    const sizeStyles = size === 'small' ? 'width:24px;height:24px;font-size:10px;' : 'width:32px;height:32px;font-size:12px;';
+    return `<div class="avatar-fallback" style="background:${color};${sizeStyles}">${initials}</div>`;
+}
