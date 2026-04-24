@@ -86,6 +86,8 @@ function handleSignOut() {
 function transitionToApp() {
     showApp();
     initializeApp();
+    initKeyboardShortcuts();
+    initDashboardInteractions();
 
     // Show/hide settings tab based on role
     const settingsTab = document.getElementById('settingsTab');
@@ -457,7 +459,7 @@ function clearAllData() {
 window.addEventListener('online', () => {
     isOnline = true;
     updateSyncIndicator();
-    showToast('Back online — syncing...', 'success');
+    showToast('Back online â syncing...', 'success');
     if (SYNC_URL) pullFromServer().then(() => syncToServer());
 });
 
