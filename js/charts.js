@@ -474,13 +474,13 @@ function updateDashboard() {
     } else {
         myEventsEl.innerHTML = myEvents.map(e => {
             const color = projectColors[e.project] || getMemberColor(me, 0);
-            const loc = e.location ? ` â ${e.location}` : '';
+            const loc = e.location ? ` — ${e.location}` : '';
             const fmtDate = typeof formatDateShort === 'function' ? formatDateShort : d => d.toLocaleDateString();
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;">
                 <div style="width:4px;height:28px;border-radius:2px;background:${color};flex-shrink:0;"></div>
                 <div style="flex:1;">
                     <div style="font-size:13px;font-weight:600;">${e.title}${loc}</div>
-                    <div style="font-size:11px;color:var(--text-dim);">${fmtDate(new Date(e.startDate+'T00:00:00'))} â ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
+                    <div style="font-size:11px;color:var(--text-dim);">${fmtDate(new Date(e.startDate+'T00:00:00'))} — ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
                 </div>
             </div>`;
         }).join('');
@@ -503,7 +503,128 @@ function updateDashboard() {
         return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f4f8;">
             <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
             <span style="flex:1;font-size:13px;font-weight:600;">${u.name.split(' ')[0]}</span>
-            <span style="font-size:12px;color:var(--text-dim);">${totalW} task${totalW!==1?s:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f4f8;font-size:12px;">
+            <span style="font-size:12px;color:var(--text-dim);">${totalW} task${totalW!==1?'s':''}</span>
+            ${ipCount > 0 ? `<span style="font-size:11px;background:rgba(0,174,239,0.15);color:var(--primary-blue);padding:1px 6px;border-radius:9999px;">${ipCount} active</span>` : ''}
+            ${doneCount > 0 ? `<span style="font-size:11px;background:rgba(0,196,160,0.15);color:var(--success);padding:1px 6px;border-radius:9999px;">${doneCount} done</span>` : ''}
+        </div>`;
+    }).join('');
+
+    // --- Team upcoming events ---
+    const allEvents = typeof events !== 'undefined' ? events : [];
+    const teamEvents = allEvents.filter(e => e.endDate >= todayStr)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .slice(0, 6);
+    const teamEventsEl = document.getElementById('dashTeamEventsList');
+    if (teamEvents.length === 0) {
+        teamEventsEl.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No upcoming events</p>';
+    } else {
+        const fmtDate = typeof formatDateShort === 'function' ? formatDateShort : d => d.toLocaleDateString();
+        teamEventsEl.innerHTML = teamEvents.map(e => {
+            const color = projectColors[e.project] || getMemberColor(e.person, 0);
+            const loc = e.location ? ` — ${e.location}` : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;">
+                <div style="width:4px;height:28px;border-radius:2px;background:${color};flex-shrink:0;"></div>
+                <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:600;">${e.title}${loc}</div>
+                    <div style="font-size:11px;color:var(--text-dim);">${e.person.split(' ')[0]} · ${fmtDate(new Date(e.startDate+'T00:00:00'))} — ${fmtDate(new Date(e.endDate+'T00:00:00'))}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+}
+
+// ============ IMPROVEMENT D: STREAK COUNTER ============
+function calculateStreak(personName) {
+    const personTasks = tasks.filter(t => t.person === personName);
+    if (personTasks.length === 0) return 0;
+
+    // Group tasks by date they were created
+    const dateMap = {};
+    personTasks.forEach(t => {
+        const dateCreated = t.createdAt ? new Date(t.createdAt).toISOString().split('T')[0] : null;
+        if (dateCreated) {
+            if (!dateMap[dateCreated]) dateMap[dateCreated] = 0;
+            dateMap[dateCreated]++;
+        }
+    });
+
+    if (Object.keys(dateMap).length === 0) return 0;
+
+    const dates = Object.keys(dateMap).sort().reverse();
+    let streak = 0;
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    let checkDate = new Date(todayStr + 'T00:00:00');
+    for (const dateStr of dates) {
+        const checkDateStr = checkDate.toISOString().split('T')[0];
+        if (dateStr === checkDateStr) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+    return streak;
+}
+
+// ============ IMPROVEMENT E: PROGRESS RINGS ============
+function renderProjectProgressRings() {
+    const container = document.querySelector('.progress-ring-container');
+    if (!container) return;
+
+    container.innerHTML = projects.map(proj => {
+        const projTasks = tasks.filter(t => t.project === proj);
+        const completed = projTasks.filter(t => t.status === 'Completed').length;
+        const total = projTasks.length;
+        const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+        const color = projectColors[proj] || '#0095d0';
+        const circumference = 2 * Math.PI * 45;
+        const offset = circumference - (pct / 100) * circumference;
+
+        return `<div class="progress-ring-card">
+            <svg class="progress-ring" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="45" fill="none" stroke="var(--border-color)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="45" fill="none" stroke="${color}" stroke-width="6"
+                    stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
+                    style="transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset 0.5s;"></circle>
+                <text x="60" y="60" text-anchor="middle" dy="0.3em" font-size="20" font-weight="700" fill="${color}">${pct}%</text>
+            </svg>
+            <div class="progress-ring-label">${proj}</div>
+            <div class="progress-ring-stat">${completed}/${total}</div>
+        </div>`;
+    }).join('');
+}
+
+// ============ IMPROVEMENT F: ACTIVITY FEED ============
+function renderActivityFeed() {
+    const log = getActivityLog().slice(0, 10);
+    if (log.length === 0) return '<p style="color:var(--text-dim);font-size:13px;">No recent activity</p>';
+
+    return `<div style="background:var(--surface-white);border-radius:var(--radius-card);padding:16px;">
+        <h4 style="font-size:14px;margin-bottom:12px;color:var(--dark-navy);">Recent Activity</h4>
+        ${log.map(entry => {
+            const ago = (function() {
+                const d = new Date(entry.timestamp);
+                const seconds = Math.floor((new Date() - d) / 1000);
+                if (seconds < 60) return 'just now';
+                const mins = Math.floor(seconds / 60);
+                if (mins < 60) return mins + 'm ago';
+                const hours = Math.floor(mins / 60);
+                if (hours < 24) return hours + 'h ago';
+                return Math.floor(hours / 24) + 'd ago';
+            })();
+            const actionColors = {
+                'create': 'var(--success)',
+                'edit': 'var(--primary-blue)',
+                'delete': 'var(--danger)',
+                'status': '#9C27B0',
+                'sync': 'var(--text-dim)',
+                'repeat': 'var(--warning)'
+            };
+            const color = actionColors[entry.action] || 'var(--text-dim)';
+            const avatar = memberAvatarHTML(entry.user, 'small');
+            return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f4f8;font-size:12px;">
                 ${avatar}
                 <div style="flex:1;">
                     <span style="color:${color};font-weight:700;">${entry.action.toUpperCase()}</span>
