@@ -285,7 +285,7 @@ function updateRecentTasks() {
         <tr>
             <td>${task.person}</td>
             <td>${task.taskTitle}</td>
-            <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${projectDisplayHTML(task.project, 16)}</span></td>
+            <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${projectDisplayHTML(task.project, 22)}</span></td>
             <td><span class="status-badge status-${task.status.toLowerCase().replace(/\s/g,'')}">${task.status}</span></td>
             <td style="font-size:12px;">${commentText}</td>
             <td style="font-size:12px;">${new Date(task.createdAt).toLocaleDateString()}</td>
@@ -393,7 +393,7 @@ function applyFilters() {
                             ${task.taskDescription ? `<button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap;" onclick="openDescriptionModal('${safeId}')">View</button>` : ''}
                         </div>
                     </td>
-                    <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${projectDisplayHTML(task.project, 16)}</span></td>
+                    <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${projectDisplayHTML(task.project, 22)}</span></td>
                     <td>${task.week || ''}</td>
                     <td><span class="priority-${priority.toLowerCase()}">${priority}</span></td>
                     <td><span class="status-badge status-${status.toLowerCase().replace(' ', '')}">${status}</span></td>
