@@ -229,7 +229,7 @@ function updateProjectsSettings() {
     const container = document.getElementById('projectsSettings');
     container.innerHTML = projects.map(p => {
         const logoPreview = projectLogos[p]
-            ? `<img src="${projectLogos[p]}" alt="${p}" style="height:24px;width:auto;border-radius:4px;margin-right:8px;vertical-align:middle;">`
+            ? `<img src="${projectLogos[p]}" alt="${p}" style="height:32px;min-width:40px;width:auto;border-radius:4px;margin-right:8px;vertical-align:middle;object-fit:contain;">`
             : '';
         const logoActions = projectLogos[p]
             ? `<button class="btn btn-sm btn-secondary" onclick="uploadProjectLogo('${p.replace(/'/g,"\\'")}')" title="Change logo" style="font-size:11px;">Change Logo</button>
@@ -239,7 +239,7 @@ function updateProjectsSettings() {
         <div class="list-item" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee;">
             <div class="list-item-content" style="flex:1;display:flex;align-items:center;">
                 ${logoPreview}
-                <span class="project-tag" style="background-color: ${projectColors[p] || '#999'};">${projectDisplayHTML(p, 18)}</span>
+                <span class="project-tag" style="background-color: ${projectColors[p] || '#999'};">${projectDisplayHTML(p, 24)}</span>
             </div>
             <div class="list-item-actions" style="display:flex;gap:6px;">
                 ${logoActions}
