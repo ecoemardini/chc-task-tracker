@@ -47,32 +47,32 @@ function buildCommandIndex() {
 
     // Navigation commands (always show when empty)
     const navCommands = [
-        { category: 'Navigation', icon: 'ð', title: 'Go to Dashboard', subtitle: '', action: () => switchTab('dashboard') },
-        { category: 'Navigation', icon: 'â', title: 'Go to Log Task', subtitle: '', action: () => switchTab('log-task') },
-        { category: 'Navigation', icon: 'ð', title: 'Go to All Tasks', subtitle: '', action: () => switchTab('all-tasks') },
-        { category: 'Navigation', icon: 'ðï¸', title: 'Go to Overview', subtitle: '', action: () => switchTab('overview') },
-        { category: 'Navigation', icon: 'ð¥', title: 'Go to Team', subtitle: '', action: () => switchTab('team') },
-        { category: 'Navigation', icon: 'ðï¸', title: 'Go to Projects', subtitle: '', action: () => switchTab('projects') },
-        { category: 'Navigation', icon: 'ð', title: 'Go to Timeline', subtitle: '', action: () => switchTab('timeline') },
-        { category: 'Navigation', icon: 'ð', title: 'Go to Calendar', subtitle: '', action: () => switchTab('calendar') },
-        { category: 'Navigation', icon: 'â¹ï¸', title: 'Go to Settings', subtitle: '', action: () => switchTab('settings'), adminOnly: true },
+        { category: 'Navigation', icon: '📊', title: 'Go to Dashboard', subtitle: '', action: () => switchTab('dashboard') },
+        { category: 'Navigation', icon: '➕', title: 'Go to Log Task', subtitle: '', action: () => switchTab('log-task') },
+        { category: 'Navigation', icon: '📋', title: 'Go to All Tasks', subtitle: '', action: () => switchTab('all-tasks') },
+        { category: 'Navigation', icon: '👁️', title: 'Go to Overview', subtitle: '', action: () => switchTab('overview') },
+        { category: 'Navigation', icon: '👥', title: 'Go to Team', subtitle: '', action: () => switchTab('team') },
+        { category: 'Navigation', icon: '🗂️', title: 'Go to Projects', subtitle: '', action: () => switchTab('projects') },
+        { category: 'Navigation', icon: '📈', title: 'Go to Timeline', subtitle: '', action: () => switchTab('timeline') },
+        { category: 'Navigation', icon: '📅', title: 'Go to Calendar', subtitle: '', action: () => switchTab('calendar') },
+        { category: 'Navigation', icon: '⚙️', title: 'Go to Settings', subtitle: '', action: () => switchTab('settings'), adminOnly: true },
     ];
 
     // Action commands
     const actionCommands = [
-        { category: 'Actions', icon: 'âï¸', title: 'New Task', subtitle: 'Log a new task', action: () => switchTab('log-task'), hint: 'Tab' },
-        { category: 'Actions', icon: 'â¡', title: 'Quick Entry', subtitle: 'Paste bulk tasks', action: () => openQuickEntry(), hint: 'Q' },
-        { category: 'Actions', icon: 'ð¥', title: 'Export Excel', subtitle: 'Download all data', action: () => exportExcel() },
-        { category: 'Actions', icon: 'ð', title: 'Sync Now', subtitle: 'Force sync with server', action: () => manualSync() },
-        { category: 'Actions', icon: 'ð', title: 'Toggle Dark Mode', subtitle: 'Switch theme', action: () => {
+        { category: 'Actions', icon: '✏️', title: 'New Task', subtitle: 'Log a new task', action: () => switchTab('log-task'), hint: 'Tab' },
+        { category: 'Actions', icon: '⚡', title: 'Quick Entry', subtitle: 'Paste bulk tasks', action: () => openQuickEntry(), hint: 'Q' },
+        { category: 'Actions', icon: '📥', title: 'Export Excel', subtitle: 'Download all data', action: () => exportExcel() },
+        { category: 'Actions', icon: '🔄', title: 'Sync Now', subtitle: 'Force sync with server', action: () => manualSync() },
+        { category: 'Actions', icon: '🌙', title: 'Toggle Dark Mode', subtitle: 'Switch theme', action: () => {
             const theme = document.documentElement.getAttribute('data-theme');
             const newTheme = theme === 'dark' ? 'light' : 'dark';
             if (newTheme === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
-                document.getElementById('themeToggle').textContent = 'âï¸';
+                document.getElementById('themeToggle').textContent = '☀️';
             } else {
                 document.documentElement.removeAttribute('data-theme');
-                document.getElementById('themeToggle').textContent = 'ð';
+                document.getElementById('themeToggle').textContent = '🌙';
             }
             localStorage.setItem('chc-theme-preference', newTheme);
             closeCommandBar();
@@ -82,9 +82,9 @@ function buildCommandIndex() {
     // Task search (match by title, description, or person)
     const taskCommands = tasks.map(t => ({
         category: 'Tasks',
-        icon: 'â',
+        icon: '✓',
         title: t.taskTitle || '(untitled)',
-        subtitle: `${t.person} â ${t.project || 'No project'}`,
+        subtitle: `${t.person} — ${t.project || 'No project'}`,
         action: () => openEditModal(t.id),
         searchText: `${t.taskTitle} ${t.taskDescription} ${t.person}`.toLowerCase()
     }));
@@ -92,9 +92,9 @@ function buildCommandIndex() {
     // People search
     const peopleCommands = users.map(u => ({
         category: 'People',
-        icon: 'ð¤',
+        icon: '👤',
         title: u.name,
-        subtitle: `${u.role} â ${tasks.filter(t => t.person === u.name).length} tasks`,
+        subtitle: `${u.role} — ${tasks.filter(t => t.person === u.name).length} tasks`,
         action: () => {
             switchTab('all-tasks');
             setTimeout(() => {
@@ -111,7 +111,7 @@ function buildCommandIndex() {
     // Project search
     const projectCommands = projects.map(p => ({
         category: 'Projects',
-        icon: 'ðï¸',
+        icon: '🗂️',
         title: p,
         subtitle: `${tasks.filter(t => t.project === p).length} tasks`,
         action: () => {
@@ -129,8 +129,8 @@ function buildCommandIndex() {
 
     // Filter navigation commands (show when empty)
     const filterCommands = [
-        { category: 'Filters', icon: 'ð', title: 'Filter by Status', subtitle: 'In Progress, Completed, etc.', action: () => switchTab('all-tasks') },
-        { category: 'Filters', icon: 'ð', title: 'Filter by Week', subtitle: 'View tasks by week', action: () => switchTab('all-tasks') },
+        { category: 'Filters', icon: '🔍', title: 'Filter by Status', subtitle: 'In Progress, Completed, etc.', action: () => switchTab('all-tasks') },
+        { category: 'Filters', icon: '📆', title: 'Filter by Week', subtitle: 'View tasks by week', action: () => switchTab('all-tasks') },
     ];
 
     // Combine all results
