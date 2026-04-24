@@ -276,7 +276,7 @@ function renderActivityLog() {
         return `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f4f8;font-size:12px;">
             <span style="color:${color};font-weight:700;text-transform:uppercase;min-width:50px;">${entry.action}</span>
             <span style="flex:1;color:var(--text-dark);">${entry.details}</span>
-            <span style="color:var(--text-dim);white-space:nowrap;font-size:11px;">${entry.user.split(' ')[0]} · ${timeStr}</span>
+            <span style="color:var(--text-dim);white-space:nowrap;font-size:11px;">${entry.user.split(' ')[0]} Â· ${timeStr}</span>
         </div>`;
     }).join('');
 }
@@ -350,12 +350,12 @@ async function syncToServer() {
                             tasks.push(st);
                         }
                     } else {
-                        // Task exists locally — field-level merge by updatedAt
+                        // Task exists locally â field-level merge by updatedAt
                         const serverTime = new Date(st.updatedAt || st.createdAt || 0).getTime();
                         const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
 
                         if (serverTime > localTime && !_dirtyTaskIds.has(sid)) {
-                            // Server is newer AND we haven't modified it locally → accept server version
+                            // Server is newer AND we haven't modified it locally â accept server version
                             Object.assign(local, st);
                         } else if (serverTime > localTime && _dirtyTaskIds.has(sid)) {
                             // CONFLICT: both changed. Do field-level merge.
@@ -401,7 +401,7 @@ async function syncToServer() {
                 if (typeof saveEventsToLocalStorage === 'function') saveEventsToLocalStorage();
             }
 
-            // Sync succeeded — clear dirty tracking
+            // Sync succeeded â clear dirty tracking
             clearDirtyIds();
             pendingChanges = [];
             savePendingChanges();
@@ -410,8 +410,8 @@ async function syncToServer() {
             localStorage.setItem('chc_last_sync', lastSyncTime.toISOString());
 
             if (conflictCount > 0) {
-                logActivity('sync', `Synced with ${conflictCount} conflict(s) — merged field-by-field`);
-                showToast(`Synced — ${conflictCount} conflict(s) merged (newest field wins)`, 'error');
+                logActivity('sync', `Synced with ${conflictCount} conflict(s) â merged field-by-field`);
+                showToast(`Synced â ${conflictCount} conflict(s) merged (newest field wins)`, 'error');
             } else {
                 showToast('Synced with server', 'success');
             }
@@ -517,14 +517,14 @@ async function pullFromServer() {
                         if (serverTime > localTime) {
                             const lastSync = lastSyncTime ? lastSyncTime.getTime() : 0;
                             if (localTime > lastSync && _dirtyTaskIds.has(sid)) {
-                                // True conflict — both sides changed
+                                // True conflict â both sides changed
                                 conflictedTasks.push({
                                     title: local.taskTitle,
                                     person: local.person
                                 });
                                 _fieldMerge(local, st);
                             } else {
-                                // Server is newer, local unchanged → accept server
+                                // Server is newer, local unchanged â accept server
                                 Object.assign(local, st);
                             }
                             changed = true;
@@ -567,8 +567,8 @@ async function pullFromServer() {
 
             if (conflictedTasks.length > 0) {
                 const names = conflictedTasks.map(c => `"${c.title}" (${c.person})`).join(', ');
-                logActivity('sync', `Pull conflict: ${conflictedTasks.length} task(s) merged — ${names}`);
-                showToast(`${conflictedTasks.length} task(s) updated by others — merged. Check activity log.`, 'error');
+                logActivity('sync', `Pull conflict: ${conflictedTasks.length} task(s) merged â ${names}`);
+                showToast(`${conflictedTasks.length} task(s) updated by others â merged. Check activity log.`, 'error');
             }
 
             lastSyncTime = new Date();
