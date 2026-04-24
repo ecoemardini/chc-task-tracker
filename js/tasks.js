@@ -239,7 +239,7 @@ function saveAllTasks() {
         });
 
         if (saved.length === 0 && skipped.length === 0) {
-            showToast('Nothing to save — all rows are empty', 'error');
+            showToast('Nothing to save â all rows are empty', 'error');
             return;
         }
 
@@ -255,7 +255,7 @@ function saveAllTasks() {
         }
 
         if (skipped.length > 0) {
-            showToast(`Saved ${saved.length} task(s). ${skipped.length} row(s) missing required fields — highlighted.`, 'error');
+            showToast(`Saved ${saved.length} task(s). ${skipped.length} row(s) missing required fields â highlighted.`, 'error');
         } else {
             showToast(`Saved ${saved.length} task(s)`, 'success');
         }
@@ -458,7 +458,7 @@ function renderEditTaskLinks() {
         return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f0f4f8;">
             <span style="font-size:16px;">&#x1F517;</span>
             <a href="${link.url}" target="_blank" rel="noopener" style="flex:1;font-size:12px;color:var(--primary-blue);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</a>
-            <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" onclick="removeLinkFromEditTask(${i})">×</button>
+            <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" onclick="removeLinkFromEditTask(${i})">Ã</button>
         </div>`;
     }).join('');
 }
@@ -506,7 +506,7 @@ function saveEditedTask() {
     task.updatedAt = new Date().toISOString();
     markTaskDirty(task.id);
     if (oldStatus !== task.status) {
-        logActivity('status', `"${task.taskTitle}" ${oldStatus} → ${task.status}`);
+        logActivity('status', `"${task.taskTitle}" ${oldStatus} â ${task.status}`);
     } else {
         logActivity('edit', `"${task.taskTitle}" edited`);
     }
@@ -534,9 +534,9 @@ function deleteTaskById(taskId) {
     applyFilters();
     updateLogKPIs();
 
-    // Show undo toast — tombstone is NOT created yet
+    // Show undo toast â tombstone is NOT created yet
     const undoTimer = setTimeout(() => {
-        // Undo window expired → finalize deletion
+        // Undo window expired â finalize deletion
         addTombstone(taskId);
         markTaskDirty(taskId);
         logActivity('delete', `"${removedTask.taskTitle}" by ${removedTask.person.split(' ')[0]} deleted`);
@@ -708,7 +708,7 @@ function executeRepeat() {
     if (count < 1 || count > 52) { showToast('Enter a count between 1 and 52', 'error'); return; }
 
     // Parse the task's week to find a base date
-    // Week format: "20–24 Apr 2026" — we need the Monday date
+    // Week format: "20â24 Apr 2026" â we need the Monday date
     const baseMonday = parseWeekToMonday(task.week);
     if (!baseMonday) {
         showToast('Could not parse the task week. Try a different task.', 'error');
@@ -761,17 +761,17 @@ function executeRepeat() {
         showToast(`Created ${created} recurring task(s)`, 'success');
         applyFilters();
     } else {
-        showToast('No weeks matched — the date range may be outside the generated weeks.', 'error');
+        showToast('No weeks matched â the date range may be outside the generated weeks.', 'error');
     }
     closeRepeatModal();
 }
 
 function parseWeekToMonday(weekStr) {
-    // Format: "20–24 Apr 2026" or "28 Apr–2 May 2026"
+    // Format: "20â24 Apr 2026" or "28 Aprâ2 May 2026"
     if (!weekStr) return null;
     try {
         // Try to extract the first day + month + year
-        const clean = weekStr.replace(/–/g, '-').replace(/—/g, '-');
+        const clean = weekStr.replace(/â/g, '-').replace(/â/g, '-');
         const parts = clean.split('-');
         const firstPart = parts[0].trim(); // "20" or "28 Apr"
         const secondPart = parts[1].trim(); // "24 Apr 2026" or "2 May 2026"
@@ -800,7 +800,7 @@ function parseWeekToMonday(weekStr) {
 
 function findWeekLabel(date) {
     // Find the week in `weeks` array that contains this date
-    // Weeks are like "20–24 Apr 2026"
+    // Weeks are like "20â24 Apr 2026"
     for (const w of weeks) {
         const mon = parseWeekToMonday(w);
         if (!mon) continue;
@@ -815,7 +815,7 @@ function findWeekLabel(date) {
 }
 
 // ============ QUICK ENTRY ============
-// Paste a freeform task list → auto-parse into structured tasks.
+// Paste a freeform task list â auto-parse into structured tasks.
 
 let _qeParsedTasks = [];
 
@@ -850,7 +850,7 @@ function parseQuickEntry() {
     const lines = raw.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 0)
-        .map(l => l.replace(/^\d+[\.\)\-\:]\s*/, '').replace(/^[\-\•\*\>]\s*/, '').trim())
+        .map(l => l.replace(/^\d+[\.\)\-\:]\s*/, '').replace(/^[\-\â¢\*\>]\s*/, '').trim())
         .filter(l => l.length > 2);
 
     if (lines.length === 0) { showToast('No tasks found in the text', 'error'); return; }
@@ -859,9 +859,9 @@ function parseQuickEntry() {
         const detected = _detectFromText(line);
         // Clean description: strip trailing status/priority tags but keep project names
         var desc = line;
-        desc = desc.replace(/\s*[-–—]\s*(done|finished|completed|complete|submitted|sent|delivered|resolved|closed|in progress|working on|started|ongoing|wip|doing|active|not started|todo|to do|pending|waiting|blocked|on hold|later|urgent|asap|critical|high priority|important|top priority|low priority|not urgent|high|medium|low)\s*$/i, '');
+        desc = desc.replace(/\s*[-ââ]\s*(done|finished|completed|complete|submitted|sent|delivered|resolved|closed|in progress|working on|started|ongoing|wip|doing|active|not started|todo|to do|pending|waiting|blocked|on hold|later|urgent|asap|critical|high priority|important|top priority|low priority|not urgent|high|medium|low)\s*$/i, '');
         desc = desc.replace(/\(\s*(done|completed|in progress|urgent|high priority|low priority|not started|pending|finished|important)\s*\)/gi, '');
-        desc = desc.replace(/\s+/g, ' ').replace(/^[\s,\-–—:]+|[\s,\-–—:]+$/g, '').trim();
+        desc = desc.replace(/\s+/g, ' ').replace(/^[\s,\-ââ:]+|[\s,\-ââ:]+$/g, '').trim();
         return {
             title: detected.category || '',
             description: desc || line,
@@ -1037,7 +1037,7 @@ function _detectFromText(text) {
     var title = text;
 
     // 1) Strip trailing status/priority tags (e.g. "- done", "- urgent", "- high priority")
-    title = title.replace(/\s*[-–—]\s*(done|finished|completed|complete|submitted|sent|delivered|resolved|closed|in progress|working on|started|ongoing|wip|doing|active|not started|todo|to do|pending|waiting|blocked|on hold|later|urgent|asap|critical|high priority|important|top priority|low priority|not urgent|high|medium|low)\s*$/i, '');
+    title = title.replace(/\s*[-ââ]\s*(done|finished|completed|complete|submitted|sent|delivered|resolved|closed|in progress|working on|started|ongoing|wip|doing|active|not started|todo|to do|pending|waiting|blocked|on hold|later|urgent|asap|critical|high priority|important|top priority|low priority|not urgent|high|medium|low)\s*$/i, '');
     // 2) Strip parenthetical tags like (done), (urgent), (in progress)
     title = title.replace(/\(\s*(done|completed|in progress|urgent|high priority|low priority|not started|pending|finished|important)\s*\)/gi, '');
 
@@ -1051,7 +1051,7 @@ function _detectFromText(text) {
 
     // 4) Clean up artifacts: trailing "for", double spaces, leading/trailing punctuation
     title = title.replace(/\s+for\s*$/i, '');
-    title = title.replace(/\s+/g, ' ').replace(/^[\s,\-–—:]+|[\s,\-–—:]+$/g, '').trim();
+    title = title.replace(/\s+/g, ' ').replace(/^[\s,\-ââ:]+|[\s,\-ââ:]+$/g, '').trim();
 
     // 5) Truncate if too long
     if (title.length > 70) {
@@ -1072,12 +1072,12 @@ function _renderQeParsed() {
     container.innerHTML = _qeParsedTasks.map((t, i) => {
         // Build project options, include "Other Tasks" if not already in the list
         const projList = projects.includes('Other Tasks') ? projects : [...projects, 'Other Tasks'];
-        const projOptions = '<option value="">— None —</option>' + projList.map(p =>
+        const projOptions = '<option value="">â None â</option>' + projList.map(p =>
             `<option value="${p}" ${p === t.project ? 'selected' : ''}>${p}</option>`
         ).join('');
 
         // Task Title = dropdown of existing taskCategories (not freeform)
-        const titleOptions = '<option value="">— Select Title —</option>' + taskCategories.map(c =>
+        const titleOptions = '<option value="">â Select Title â</option>' + taskCategories.map(c =>
             `<option value="${c}" ${c === t.title ? 'selected' : ''}>${c}</option>`
         ).join('');
 
@@ -1090,9 +1090,9 @@ function _renderQeParsed() {
                 <span style="color:var(--text-dim);font-weight:700;font-size:12px;min-width:20px;">${i + 1}</span>
                 <div style="flex:1;">
                     <select class="qe-title" ${titleDetected} style="width:100%;font-weight:600;font-size:13px;border:1px solid #e0e7f1;border-radius:6px;padding:6px 8px;margin-bottom:4px;">${titleOptions}</select>
-                    <div style="font-size:11px;color:var(--text-dim);line-height:1.4;max-height:36px;overflow:hidden;margin-top:2px;">📝 ${t.description}</div>
+                    <div style="font-size:11px;color:var(--text-dim);line-height:1.4;max-height:36px;overflow:hidden;margin-top:2px;">ð ${t.description}</div>
                 </div>
-                <button class="btn btn-sm btn-danger" onclick="removeQeTask(${i})" style="padding:2px 8px;font-size:11px;">×</button>
+                <button class="btn btn-sm btn-danger" onclick="removeQeTask(${i})" style="padding:2px 8px;font-size:11px;">Ã</button>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <select class="qe-project" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #e0e7f1;">${projOptions}</select>
@@ -1164,4 +1164,163 @@ function saveQuickEntryTasks() {
     }
 
     closeQuickEntry();
+}
+
+// ============ IMPROVEMENT G: INLINE TASK EDITING ============
+let _selectedTaskIds = new Set();
+
+function toggleTaskStatus(taskId, currentStatus) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !canEditTask(task)) return;
+
+    const statusCycle = ['Not Started', 'In Progress', 'Completed'];
+    const currentIdx = statusCycle.indexOf(currentStatus);
+    const nextIdx = (currentIdx + 1) % statusCycle.length;
+    task.status = statusCycle[nextIdx];
+    markTaskDirty(taskId);
+    saveToLocalStorage();
+    applyFilters();
+    showToast(`Status changed to "${task.status}"`, 'success');
+}
+
+function toggleTaskPriority(taskId, currentPriority) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !canEditTask(task)) return;
+
+    const priorityCycle = ['Low', 'Medium', 'High'];
+    const currentIdx = priorityCycle.indexOf(currentPriority);
+    const nextIdx = (currentIdx + 1) % priorityCycle.length;
+    task.priority = priorityCycle[nextIdx];
+    markTaskDirty(taskId);
+    saveToLocalStorage();
+    applyFilters();
+    showToast(`Priority changed to "${task.priority}"`, 'success');
+}
+
+// ============ IMPROVEMENT I: BULK ACTIONS ============
+function toggleTaskSelection(taskId) {
+    if (_selectedTaskIds.has(taskId)) {
+        _selectedTaskIds.delete(taskId);
+    } else {
+        _selectedTaskIds.add(taskId);
+    }
+    updateBulkToolbar();
+}
+
+function toggleSelectAll() {
+    const checkbox = document.getElementById('selectAllCheckbox');
+    const tbody = document.getElementById('allTasksBody');
+    const rows = tbody.querySelectorAll('tr');
+    if (checkbox.checked) {
+        rows.forEach(row => {
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                const taskId = checkbox.value;
+                _selectedTaskIds.add(taskId);
+                checkbox.checked = true;
+            }
+        });
+    } else {
+        _selectedTaskIds.clear();
+        rows.forEach(row => {
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            if (checkbox) checkbox.checked = false;
+        });
+    }
+    updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+    const count = _selectedTaskIds.size;
+    let toolbar = document.getElementById('bulkToolbar');
+    
+    if (count > 0) {
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = 'bulkToolbar';
+            toolbar.className = 'bulk-toolbar';
+            document.body.appendChild(toolbar);
+        }
+        toolbar.innerHTML = `
+            <div class="selected-count">${count} selected</div>
+            <button class="btn btn-sm btn-success" onclick="bulkMarkComplete()">Mark Complete</button>
+            <button class="btn btn-sm btn-primary" onclick="bulkMarkInProgress()">Mark In Progress</button>
+            <button class="btn btn-sm btn-danger" onclick="bulkDeleteSelected()">Delete</button>
+            <button class="btn btn-sm btn-secondary" onclick="bulkClearSelection()">Clear</button>
+        `;
+    } else if (toolbar) {
+        toolbar.remove();
+    }
+}
+
+function bulkMarkComplete() {
+    let count = 0;
+    _selectedTaskIds.forEach(taskId => {
+        const task = tasks.find(t => t.id === taskId);
+        if (task && canEditTask(task)) {
+            task.status = 'Completed';
+            markTaskDirty(taskId);
+            count++;
+        }
+    });
+    saveToLocalStorage();
+    applyFilters();
+    _selectedTaskIds.clear();
+    updateBulkToolbar();
+    showToast(`${count} task(s) marked complete`, 'success');
+}
+
+function bulkMarkInProgress() {
+    let count = 0;
+    _selectedTaskIds.forEach(taskId => {
+        const task = tasks.find(t => t.id === taskId);
+        if (task && canEditTask(task)) {
+            task.status = 'In Progress';
+            markTaskDirty(taskId);
+            count++;
+        }
+    });
+    saveToLocalStorage();
+    applyFilters();
+    _selectedTaskIds.clear();
+    updateBulkToolbar();
+    showToast(`${count} task(s) marked in progress`, 'success');
+}
+
+function bulkDeleteSelected() {
+    if (_selectedTaskIds.size === 0) return;
+    if (!confirm(`Delete ${_selectedTaskIds.size} task(s)? This cannot be undone.`)) return;
+
+    let count = 0;
+    _selectedTaskIds.forEach(taskId => {
+        const task = tasks.find(t => t.id === taskId);
+        if (task && canDeleteTask(task)) {
+            addTombstone(taskId);
+            tasks = tasks.filter(t => t.id !== taskId);
+            count++;
+        }
+    });
+    saveToLocalStorage();
+    applyFilters();
+    _selectedTaskIds.clear();
+    updateBulkToolbar();
+    showToast(`${count} task(s) deleted`, 'success');
+}
+
+function bulkClearSelection() {
+    _selectedTaskIds.clear();
+    document.querySelectorAll('#allTasksBody input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateBulkToolbar();
+}
+
+// ============ IMPROVEMENT J: TASK PINNING ============
+function toggleTaskPin(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.pinned = !task.pinned;
+    markTaskDirty(taskId);
+    saveToLocalStorage();
+    applyFilters();
+    showToast(task.pinned ? 'Task pinned' : 'Task unpinned', 'success');
 }
