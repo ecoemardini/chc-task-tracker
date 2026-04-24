@@ -254,7 +254,7 @@ function renderProjectSummaryGrid() {
         const color = projectColors[p] || '#999';
         const hasLogo = !!projectLogos[p];
         const logoImg = hasLogo
-            ? `<img src="${projectLogos[p]}" alt="${p}" title="${p}" style="height:28px;width:auto;max-width:70px;object-fit:contain;">`
+            ? `<img src="${projectLogos[p]}" alt="${p}" title="${p}" style="height:36px;min-width:50px;width:auto;max-width:90px;object-fit:contain;">`
             : `<div style="width:28px;height:28px;border-radius:6px;background:${color};"></div>`;
         const nameDiv = hasLogo ? '' : `<div style="font-weight:700;font-size:13px;color:#2d3e4e;">${p}</div>`;
         return `
@@ -455,7 +455,7 @@ function updateDashboard() {
             myTasks.map(t => {
                 const statusColors = { 'Completed': 'var(--success)', 'In Progress': 'var(--primary-blue)', 'Not Started': 'var(--text-dim)' };
                 const statusIcon = t.status === 'Completed' ? '&#10003;' : t.status === 'In Progress' ? '&#9654;' : '&#9675;';
-                const projTag = t.project ? `<span class="project-tag" style="background:${projectColors[t.project]||'#999'};font-size:10px;padding:1px 6px;">${projectDisplayHTML(t.project,14)}</span>` : '';
+                const projTag = t.project ? `<span class="project-tag" style="background:${projectColors[t.project]||'#999'};font-size:10px;padding:1px 6px;">${projectDisplayHTML(t.project,20)}</span>` : '';
                 return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f4f8;">
                     <span style="color:${statusColors[t.status]||'#999'};font-size:14px;">${statusIcon}</span>
                     <span style="flex:1;font-size:13px;${t.status==='Completed'?'text-decoration:line-through;color:var(--text-dim);':''}">${t.taskTitle}</span>
