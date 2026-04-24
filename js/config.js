@@ -47,8 +47,8 @@ function projectLogoHTML(project, size) {
 function projectDisplayHTML(project, logoSize) {
     const src = projectLogos[project];
     if (src) {
-        const s = logoSize || 18;
-        return `<img src="${src}" alt="${project}" title="${project}" style="height:${s}px;width:auto;vertical-align:middle;border-radius:2px;object-fit:contain;">`;
+        const s = logoSize || 22;
+        return `<img src="${src}" alt="${project}" title="${project}" style="height:${s}px;min-width:${Math.round(s*1.5)}px;width:auto;vertical-align:middle;border-radius:2px;object-fit:contain;">`;
     }
     return project || '';
 }
