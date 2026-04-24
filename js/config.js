@@ -43,6 +43,51 @@ function projectLogoHTML(project, size) {
     return `<img src="${src}" alt="" style="height:${s}px;width:auto;vertical-align:middle;margin-right:4px;border-radius:2px;">`;
 }
 
+// Returns logo if available, otherwise plain text name. For tags where showing both is redundant.
+function projectDisplayHTML(project, logoSize) {
+    const src = projectLogos[project];
+    if (src) {
+        const s = logoSize || 18;
+        return `<img src="${src}" alt="${project}" title="${project}" style="height:${s}px;width:auto;vertical-align:middle;border-radius:2px;object-fit:contain;">`;
+    }
+    return project || '';
+}
+
+// Upload a logo for a project (base64) and persist to localStorage
+function uploadProjectLogo(projectName) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 500000) {
+            showToast('Image too large (max 500KB). Try a smaller or compressed image.', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            projectLogos[projectName] = ev.target.result;
+            saveToLocalStorage();
+            showToast(`Logo set for ${projectName}`, 'success');
+            // Refresh any visible views
+            if (typeof updateProjectsSettings === 'function') updateProjectsSettings();
+            if (typeof updateDashboard === 'function') updateDashboard();
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+// Remove a project logo
+function removeProjectLogo(projectName) {
+    delete projectLogos[projectName];
+    saveToLocalStorage();
+    showToast(`Logo removed for ${projectName}`, 'success');
+    if (typeof updateProjectsSettings === 'function') updateProjectsSettings();
+    if (typeof updateDashboard === 'function') updateDashboard();
+}
+
 let editingTaskId = null;
 let commentingTaskId = null;
 let currentChart = {};
