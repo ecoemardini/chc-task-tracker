@@ -186,3 +186,6 @@ function escapeHtml(text) {
     };
     return String(text || '').replace(/[&<>"']/g, m => map[m]);
 }
+
+// Alias for compatibility
+const updateKanban = updateKanbanTab;
