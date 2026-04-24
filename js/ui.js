@@ -239,7 +239,7 @@ function renderTasksAsTable(tasks) {
                 <td>${t.person}</td>
                 <td>${t.taskTitle}</td>
                 <td>${t.project}</td>
-                <td><span class="status-badge status-${t.status.toLowerCase().replace(/\s/g,'')}}">${t.status}</span></td>
+                <td><span class="status-badge status-${t.status.toLowerCase().replace(/\s/g,'')}">${t.status}</span></td>
                 <td>${t.comments}</td>
             </tr>`).join('')}
         </tbody>
