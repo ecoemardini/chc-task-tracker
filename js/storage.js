@@ -546,12 +546,12 @@ async function pullFromServer() {
                 });
             }
 
-            // Merge events from server
+            // Merge events from server (respect event tombstones)
             if (result.events && typeof events !== 'undefined') {
                 const localEventIds = new Set(events.map(e => e.id));
                 let eventsChanged = false;
                 result.events.forEach(se => {
-                    if (!localEventIds.has(se.id)) { events.push(se); eventsChanged = true; }
+                    if (!localEventIds.has(se.id) && !isEventTombstoned(se.id)) { events.push(se); eventsChanged = true; }
                 });
                 if (eventsChanged && typeof saveEventsToLocalStorage === 'function') saveEventsToLocalStorage();
             }
