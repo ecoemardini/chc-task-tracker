@@ -259,7 +259,7 @@ function renderCalendar() {
             var topPx = ve.row * (evtHeight + 2) + 2;
 
             var evtColor = projectColors[evt.project] || color;
-            var logo = projectLogoHTML(evt.project, 14);
+            var logo = projectLogoHTML(evt.project, 20);
             var loc = evt.location ? ' \u00b7 ' + evt.location : '';
 
             evtBlocks += '<div class="cal-evt"' +
@@ -402,7 +402,7 @@ function showEventDetail(id) {
     if (!evt) return;
     const canDel = currentUser.role === 'admin' || evt.createdBy === currentUser.name;
     const locationLine = evt.location ? `<p><strong>Location:</strong> ${evt.location}</p>` : '';
-    const projectLine = evt.project ? `<p><strong>Project:</strong> ${projectDisplayHTML(evt.project, 16)}</p>` : '';
+    const projectLine = evt.project ? `<p><strong>Project:</strong> ${projectDisplayHTML(evt.project, 24)}</p>` : '';
 
     document.getElementById('eventDetailBody').innerHTML = `
         <h3 style="margin-bottom:12px;color:var(--dark-navy);">${evt.title}</h3>
