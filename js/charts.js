@@ -502,8 +502,11 @@ function updateDashboard() {
         const ipCount = weekTasks.filter(t => t.status === 'In Progress').length;
         const doneCount = weekTasks.filter(t => t.status === 'Completed').length;
         const totalW = weekTasks.length;
+        const avatarImg = userAvatars[u.name]
+            ? `<img src="${userAvatars[u.name]}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+            : `<div style="width:28px;height:28px;border-radius:50%;background:${color};flex-shrink:0;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;">${u.name.split(' ').map(w=>w[0]).join('').substring(0,2)}</div>`;
         return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f4f8;">
-            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+            ${avatarImg}
             <span style="flex:1;font-size:13px;font-weight:600;">${u.name.split(' ')[0]}</span>
             <span style="font-size:12px;color:var(--text-dim);">${totalW} task${totalW!==1?'s':''}</span>
             ${ipCount > 0 ? `<span style="font-size:11px;background:rgba(0,174,239,0.15);color:var(--primary-blue);padding:1px 6px;border-radius:9999px;">${ipCount} active</span>` : ''}
