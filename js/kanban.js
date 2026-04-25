@@ -102,7 +102,10 @@ function renderKanban() {
 
             // Only show person badge if admin is viewing all people
             const personBadge = isAdmin
-                ? `<span class="kanban-person-badge">${escapeHtml(personFirstName)}</span>`
+                ? `<span class="kanban-person-badge" style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;">
+                    ${userAvatars[task.person]
+                        ? `<img src="${userAvatars[task.person]}" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover;">`
+                        : ''}${escapeHtml(personFirstName)}</span>`
                 : '';
 
             html += `
