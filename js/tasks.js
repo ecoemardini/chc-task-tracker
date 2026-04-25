@@ -283,7 +283,7 @@ function updateRecentTasks() {
         const commentText = task.comments ? task.comments.substring(0, 50) + (task.comments.length > 50 ? '...' : '') : '\u2014';
         return `
         <tr>
-            <td>${task.person}</td>
+            <td>${personAvatarHTML(task.person, {size: 30, inline: false})}</td>
             <td>${task.taskTitle}</td>
             <td><span class="project-tag" style="background-color: ${projectColors[task.project] || '#999'};">${projectDisplayHTML(task.project, 22)}</span></td>
             <td><span class="status-badge status-${task.status.toLowerCase().replace(/\s/g,'')}">${task.status}</span></td>
@@ -385,7 +385,7 @@ function applyFilters() {
             return `
                 <tr>
                     ${currentUser.role === 'admin' ? `<td><input type="checkbox" class="checkbox task-checkbox" data-task-id="${safeId}"></td>` : ''}
-                    <td>${task.person || ''}</td>
+                    <td>${personAvatarHTML(task.person || '', {size: 30, inline: false})}</td>
                     <td>${task.taskTitle || ''}</td>
                     <td style="font-size:12px;color:#6b7b8d;max-width:200px;">
                         <div style="display:flex;align-items:center;gap:6px;">
