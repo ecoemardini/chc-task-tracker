@@ -5,7 +5,7 @@
 
 // --- Core localStorage ---
 function saveToLocalStorage() {
-    const data = { tasks, projects, taskCategories, users, weeks, projectColors, projectLogos, events: (typeof events !== 'undefined' ? events : []) };
+    const data = { tasks, projects, taskCategories, users, weeks, projectColors, projectLogos, userAvatars, events: (typeof events !== 'undefined' ? events : []) };
     localStorage.setItem('chc_task_logger_v2', JSON.stringify(data));
 }
 
@@ -21,6 +21,7 @@ function loadFromLocalStorage() {
             weeks = data.weeks || weeks;
             Object.assign(projectColors, data.projectColors || {});
             if (data.projectLogos) Object.assign(projectLogos, data.projectLogos);
+            if (data.userAvatars) Object.assign(userAvatars, data.userAvatars);
             if (typeof events !== 'undefined' && data.events) events = data.events;
         } catch (err) {
             console.error('Failed to load data:', err);
