@@ -188,14 +188,28 @@ function updateTeamMembersSettings() {
         const colors = { admin: '#00aeef', member: '#00c4a0', observer: '#ffa94d' };
         return `<span style="display:inline-block;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;color:white;background:${colors[role]||'#999'}">${role}</span>`;
     };
-    container.innerHTML = users.map(u => `
-        <div class="list-item">
-            <div class="list-item-content"><strong>${u.name}</strong> ${roleBadge(u.role)}</div>
-            <div class="list-item-actions">
-                ${u.name !== currentUser.name ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.name.replace(/'/g, "\\'")}')">Remove</button>` : '<small style="color:#999">You</small>'}
+    container.innerHTML = users.map(u => {
+        const safeName = u.name.replace(/'/g, "\\'");
+        const avatarPreview = userAvatars[u.name]
+            ? `<img src="${userAvatars[u.name]}" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+            : (() => { const _c = ['#4f46e5','#0891b2','#059669','#d97706','#dc2626','#7c3aed']; const _i = u.name.split('').reduce((a,c)=>a+c.charCodeAt(0),0) % _c.length; return `<div style="width:36px;height:36px;border-radius:50%;background:${_c[_i]};display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;flex-shrink:0;">${u.name.split(' ').map(w=>w[0]).join('').substring(0,2)}</div>`; })();
+        const avatarActions = userAvatars[u.name]
+            ? `<button class="btn btn-sm btn-secondary" onclick="uploadUserAvatar('${safeName}')" style="font-size:11px;">Change Photo</button>
+               <button class="btn btn-sm btn-secondary" onclick="removeUserAvatar('${safeName}')" style="font-size:11px;">Remove Photo</button>`
+            : `<button class="btn btn-sm btn-secondary" onclick="uploadUserAvatar('${safeName}')" style="font-size:11px;">Upload Photo</button>`;
+        return `
+        <div class="list-item" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #eee;">
+            ${avatarPreview}
+            <div style="flex:1;">
+                <strong>${u.name}</strong> ${roleBadge(u.role)}
+                ${u.name === currentUser.name ? ' <small style="color:#999">(You)</small>' : ''}
             </div>
-        </div>
-    `).join('');
+            <div style="display:flex;gap:6px;align-items:center;">
+                ${avatarActions}
+                ${u.name !== currentUser.name ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${safeName}')">Remove</button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function addTeamMember() {
